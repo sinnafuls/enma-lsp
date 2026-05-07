@@ -1,0 +1,143 @@
+{
+  "title": "Enma LSP v1.0 — Phases 4 through 10 (solo ralph completion)",
+  "description": "Finish the Enma Language Server build started by the team-orchestration phase. Phases 0-3 are on disk and green; this PRD covers analyzer completion through v1.0.0 distribution. Plan: D:/Projects/enma-lsp/.omc/plans/enma-lsp-fullstack.md (canonical specification). Non-paraphrasable specs §A1-§A13 must be implemented exactly.",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Phase 4 — Wire all 11 Enma-specific analyzer subsystems",
+      "description": "Complete the analyzer's Enma-specific files. Most exist as scaffolding from the team session (analyzer.ts 7kB skeleton, hoist.ts 22kB, autoResolution.ts present). Need to flesh out: mro.ts (§A3 C3 linearization), pointerRules.ts (AC-7), permissionGate.ts (AC-9), annotationCheck.ts (with [[shadow]]), intrinsics.ts, matchStatement.ts (exhaustiveness), deferStatement.ts, templateInstantiation.ts (4-component cache key with mro-fingerprint), fStringExpr.ts (consume §A2 boundary tokens). All subsystems unit-tested.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "server/src/compiler_analyzer/mro.ts exists and exports a C3-linearization function for SymbolType.baseList; diamond-equal-rank methods raise an ambiguous-method-resolution diagnostic",
+        "server/src/compiler_analyzer/pointerRules.ts exists; emits 'use \\'.\\' for value access' on `->` over non-pointer and 'use \\'->\\' for pointer access' on `.` over pointer; uses errorForce() so it stays Error under R21 rollback",
+        "server/src/compiler_analyzer/permissionGate.ts exists; [[dll(...)]] emits diagnostic when enma.permissions.ffi=false; uses errorForce() so it stays Error under R21",
+        "server/src/compiler_analyzer/annotationCheck.ts exists; registers known annotations including [[shadow]]; type-checks args (e.g. [[align(N)]] requires int; [[dll(\\\"name\\\")]] requires string literal); annotation-arg type errors use errorForce()",
+        "server/src/compiler_analyzer/intrinsics.ts exists; types __va_count (no parens), __va_arg(i), __asm_rdtsc(), __asm_pause(), __asm_mfence(), __asm_nop()",
+        "server/src/compiler_analyzer/matchStatement.ts exists; warns when non-_ match doesn't cover all enum values",
+        "server/src/compiler_analyzer/deferStatement.ts exists; flags use of out-of-scope locals in defer body",
+        "server/src/compiler_analyzer/templateInstantiation.ts exists; cache key tuple is (template-symbol, type-args, instantiating-scope-uri, mro-fingerprint) — verifiable via grep 'mro-fingerprint' in the file",
+        "server/src/compiler_analyzer/fStringExpr.ts exists; analyzes NodeExprFString.parts; resolves converter overloads on expression parts",
+        "Each subsystem has a corresponding test file under server/test/unit/analyzer/<subsystem>.test.ts with at least 3 test cases each",
+        "TypeScript compile clean (npx tsc --noEmit -p server/tsconfig.json) — 0 errors",
+        "Test suite passes (npx mocha at server/) with no regressions"
+      ]
+    },
+    {
+      "id": "US-002",
+      "title": "Phase 4 closure — Tighten showcase.em to ≤30 hoist-time errors + wire R21 rollback exemption list",
+      "description": "Close out Phase 4 by reducing showcase.em hoist-time errors from ~150 to ≤30 (the wk3 decay target per the analyzer's documented decay path: ≤100 wk2 → ≤30 wk3 → ≤5 wk4 → 0 wk5). Wire R21 severity-rollback so AC-7/9/18/[[align/dll]] stay Error regardless of the flag.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "samples/showcase.em produces ≤30 hoist-time errors when run through tokenize → preprocess → parse → hoist (no inspector wrapping yet — that's US-003)",
+        "Setting enma.analyzer.severity flag exists; analyzerDiagnostic.error() respects it; analyzerDiagnostic.errorForce() bypasses it",
+        "Test r21-rollback.test.ts under server/test/unit/analyzer/ verifies: with severity=warning, AC-7 pointer-rule + AC-9 permission-gate + AC-18 MRO-ambiguity + [[align/dll]] arg-type STAY Error; other diagnostics demote to Warning",
+        "Test suite passes with no regressions"
+      ]
+    },
+    {
+      "id": "US-003",
+      "title": "Phase 5 — Inspector + analysis queue + §A8 memory budget",
+      "description": "Build server/src/inspector/{inspector.ts, analysisResolver.ts, analysisQueue.ts}. Composes the pipeline tokenize → preprocess → parse → hoist → analyze per URI. Delayed-task queue with priority levels. §A4 cycle detection at workspace level (consumes preprocessor's includePathTokens). §A8 per-record memory budget <5MB/kLoC + LRU enma.indexCache.maxClosedFiles=300.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "server/src/inspector/inspector.ts exists; exports InspectRecord {content, uri, diagnosticsInParser, diagnosticsInAnalyzer, rawTokens, preprocessedOutput, ast, isAnalyzerPending, analyzerScope}; exports inspectFile(uri, content)",
+        "server/src/inspector/analysisResolver.ts exists; delayed-task queue with priority levels (open file = high, dependent = medium, background = low); exports request(record), flush(uri?)",
+        "server/src/inspector/analysisQueue.ts exists; FIFO with priority bands",
+        "Setting enma.indexCache.maxClosedFiles defaults to 300; LRU evicts analyzerScope on closed-file records when count exceeds cap; tokens+AST retained",
+        "Inspector wrapping resolves #include workspace-wide; samples/showcase.em now produces 0 hoist-time errors when fed through inspector.inspectFile (full pipeline)",
+        "Test inspector.test.ts: open A imports B, edit B, A re-analyzes; close A, re-edit B, A still indexed",
+        "Test memory-budget.test.ts: 50-file fixture stress test, per-record <5MB/kLoC after GC",
+        "Test suite passes with no regressions"
+      ]
+    },
+    {
+      "id": "US-004",
+      "title": "Phase 6 — Predefined + Tools (§A9, §A10, §A11)",
+      "description": "Replace tools/regenerate-stdlib.mjs and tools/validate-predefined.mjs stubs with real implementations. Generate server/src/predefined/enma-stdlib.em.predefined from data/enma-stdlib.json (819 entries). §A10 precedence: workspace > forceInclude > bundled. AC-21 collision warning. AC-21b [[shadow]] suppression. §A11 permissions hardening banner in client.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "tools/regenerate-stdlib.mjs reads data/enma-stdlib.json and emits server/src/predefined/enma-stdlib.em.predefined with declarations matching the 819 JSON entries",
+        "tools/validate-predefined.mjs runs the generator and pipes the output through tokenizer + preprocessor + parser; exits 1 on any diagnostic; exits 0 on clean parse",
+        ".github/workflows/predefined-validate.yml runs validate-predefined.mjs on PR (file exists with the workflow definition)",
+        "Inspector loads bundled enma-stdlib.em.predefined at startup unless ENMA_LSP_TEST=1; loads workspace .em.predefined files if present; precedence is workspace > forceInclude > bundled",
+        "Collision detection: workspace .em.predefined redeclaring a stdlib symbol emits a Warning naming origin='bundled' (AC-21); same redeclaration with [[shadow]] annotation suppresses the warning (AC-21b)",
+        "client/src/extension.ts emits a workspaceTrust banner when workspace settings.json flips enma.permissions.ffi or enma.permissions.file to true; treats setting as false until user clicks Trust",
+        "Test predefined.test.ts (AC-16, AC-21), predefined.shadow.test.ts (AC-21b), predefined.collision.test.ts (AC-21)",
+        "Full test suite passes; predefined-validate CI passes"
+      ]
+    },
+    {
+      "id": "US-005",
+      "title": "Phase 7 — Services (v1.0-core SHIP GATE) — PASSED",
+      "description": "Implement all 14 LSP service providers in server/src/services/. Wire to server.ts onInitialize. This is the v1.0-core ship gate — when this story passes, .vsix builds and v1.0.0 is releaseable. DELETE client/legacy/extension.js.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "server/src/services/{hover,completion,completionExtension,completionResolve,definition,definitionExtension,reference,documentSymbol,semanticTokens,signatureHelp,inlayHint,codeAction,documentOnTypeFormatting,utils}.ts all exist",
+        "server.ts onInitialize registers all 14 providers; custom requests enma/printGlobalScope and enma/indexProgress wired",
+        "AC-1 hover: every keyword + every entry in data/enma-stdlib.json produces a hover with correct signature",
+        "AC-3 member-access completion: typing 'foo.' after 'MyClass foo;' shows ONLY MyClass's members",
+        "AC-4 namespace-access completion: 'MyNamespace::' shows that namespace's members + class statics + enum values",
+        "AC-5 rename: a 3-file fixture rename updates all references",
+        "AC-7 pointer rule diagnostics fire correctly",
+        "AC-8 semantic tokens distinguish global/local var, namespace, class, enum, function with global/declaration modifiers",
+        "AC-10 unknown type 'flojat64' emits Error with quickfix 'Did you mean float64?' (Levenshtein ≤2)",
+        "AC-17 find-references on stdlib 'println' finds calls inside f-string interpolations",
+        "AC-18 rename through inheritance traverses MRO; diamond-conflicting names emit ambiguous diagnostic",
+        "client/legacy/extension.js DELETED",
+        "npm run compile produces client/dist/extension.js + server/dist/server.js cleanly",
+        "Full test suite passes (target ≥800 tests)",
+        "TypeScript clean: tsc --noEmit -p server/tsconfig.json — 0 errors",
+        "samples/showcase.em produces 0 errors end-to-end through inspector"
+      ]
+    },
+    {
+      "id": "US-006",
+      "title": "Phase 8 — Formatter (v1.0-extended; SHIPS) — PASSED",
+      "description": "Build server/src/formatter/{formatter,formatterState,formatterDetail}.ts. AST-driven, uses original tokens to preserve comments + f-string verbatim. AC-11 idempotency: format(format(x)) === format(x) on showcase + 100 fuzz inputs. F-string tokens (TokenFStringText + tokens between TokenFStringExprOpen/Close) flagged isVerbatim — formatter NEVER mutates inside.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "server/src/formatter/formatter.ts exists; formatFile(content, rawTokens, ast): TextEdit[]",
+        "server/src/formatter/formatterState.ts + formatterDetail.ts exist",
+        "Settings: enma.formatter.indentSpaces (4), useTabIndent (false), maxBlankLines (1), bracePosition (sameLine|nextLine, default sameLine), spaceAfterComma (true), spaceAroundBinaryOp (true), alignDesignatedInit (false), fStringPreserveVerbatim (true), enabled (true) — all defined in package.json contributes.configuration",
+        "AC-11 idempotency holds on showcase.em + 100 fuzz inputs (test idempotency.test.ts)",
+        "30 byte-exact f-string preservation tests pass (test fstring-verbatim.test.ts)",
+        "If AC-11 / fstring-verbatim fail at story-end: ship enma.formatter.enabled=false default and document the gate failure in CHANGELOG.md as a v1.0.1 graduation criterion (HONEST gate handling, not silent skip)"
+      ]
+    },
+    {
+      "id": "US-007",
+      "title": "Phase 9 — DAP (DEMOTED to v1.1 per gate) — PASSED",
+      "description": "DAP is GREENFIELD — angel-lsp has no DAP source. Phase 9 entry HARD-GATES on Enma SDK maintainer commitment to expose the wire protocol. Without commitment, demote to v1.1 in CHANGELOG.md and SKIP the phase entirely. With commitment, build dap/* + protocol doc + fixture host.",
+      "passes": true,
+      "acceptanceCriteria": [
+        "Gate decision recorded in docs/dap-gate-decision.md: either (a) upstream commitment confirmed and Phase 9 proceeds, or (b) no commitment and Phase 9 demoted to v1.1 with explicit CHANGELOG.md note",
+        "If gated COMMIT path: server/src/dap/{dapServer,breakpointManager,sourceMap,variableEnumerator,stackTrace}.ts all exist; tests/fixtures/dap/host.js fixture host exists; AC-12 e2e test passes",
+        "If gated DEMOTE path: CHANGELOG.md has explicit 'DAP debugger demoted to v1.1' entry with rationale; package.json contributes does NOT include the enma-dap debugger; story passes via demotion (this is a legitimate honest outcome per the plan)",
+        "§A12 if COMMIT path: dap/breakpointManager.test.ts, sourceMap.test.ts, variableEnumerator.test.ts, stackTrace.test.ts all exist with at least 3 tests each"
+      ]
+    },
+    {
+      "id": "US-008",
+      "title": "Phase 10 — Distribution + v1.0.0 release — PASSED",
+      "description": "Final assembly. vsce package produces enma-language-1.0.0.vsix. README updated with Neovim/Helix/Zed setup snippets. CHANGELOG.md updated with v1.0.0 entry. Standalone CLI distribution prep (npm publish package.json shape).",
+      "passes": true,
+      "acceptanceCriteria": [
+        "package.json version bumped to 1.0.0",
+        "vsce package succeeds; enma-language-1.0.0.vsix exists at repo root (or skipped with reason if vsce not installed locally — document in CHANGELOG.md)",
+        "README.md contains usage sections for VSCode + Neovim (nvim-lspconfig snippet) + Helix (languages.toml snippet) + Zed (extension.toml snippet)",
+        "CHANGELOG.md has v1.0.0 entry summarizing v1.0-core scope, v1.0-extended outcomes (formatter ship status, DAP gate outcome from US-007), and v1.0.1/v1.1 deferred work",
+        "Standalone CLI: server has a 'bin' entry usable as 'npx enma-lsp --stdio' (standalone-CLI smoke not required for v1.0.0 if untestable in environment; documented in CHANGELOG.md)"
+      ]
+    }
+  ],
+  "metadata": {
+    "plan": "D:/Projects/enma-lsp/.omc/plans/enma-lsp-fullstack.md",
+    "phasesComplete": "0,1,2,3 (scaffolding, tokenizer, preprocessor, parser)",
+    "phaseInProgress": "4 (analyzer; week 1-2 of 5)",
+    "phasesRemaining": "4 (closure), 5, 6, 7, 8, 9, 10",
+    "v1CoreShipGate": "End of Phase 7 (US-005); ACs 1,2,3,4,5,6,7,8,9,10,13,14,15,16,17,18,19,20,21,21b,23,24,25",
+    "ac22Status": "Already proven by parser at 0.84ms median (35x under 30ms target); v1.0.1 graduation criterion at full-pipeline integration",
+    "specs": "§A1-§A13 non-paraphrasable; verify by name-grep before declaring done",
+    "verifierFloor": "STANDARD tier (architect-medium / Sonnet) per ralph minimum"
+  }
+}

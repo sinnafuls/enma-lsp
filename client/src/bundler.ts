@@ -1,0 +1,264 @@
+// VSCode commands + task provider for the Enma bundler.
+//
+// Mirrors angel-lsp's bundler UX:
+//   enma.bundle           — bundle the configured source/output pair
+//   enma.bundleStripped   — same with comments stripped
+//   enma.bundleProject    — pick from `enma.projects` and bundle one
+//   enma.bundleAll        — bundle every entry in `enma.projects`
+//   enma.initProject      — scaffold .vscode/tasks.json + source/main.em
+//
+// The bundler script itself lives at `<extension>/scripts/bundler.mjs` and is
+// invoked via `child_process.fork()` so that errors surface verbatim in the
+// "Enma Bundler" output channel.
+
+import * as path from 'path';
+import * as fs from 'fs';
+import { fork } from 'child_process';
+import {
+    commands,
+    workspace,
+    window,
+    tasks,
+    Task,
+    TaskProvider,
+    TaskDefinition,
+    TaskScope,
+    ShellExecution,
+    ExtensionContext,
+    OutputChannel,
+    Uri,
+} from 'vscode';
+
+interface ProjectConfig {
+    name: string;
+    src: string;
+    out: string;
+    strip?: boolean;
+}
+
+interface BundleTaskDefinition extends TaskDefinition {
+    type: 'enma-bundle';
+    src: string;
+    out: string;
+    strip?: boolean;
+}
+
+let outputChannel: OutputChannel | undefined;
+
+function getOutput(): OutputChannel {
+    if (!outputChannel) outputChannel = window.createOutputChannel('Enma Bundler');
+    return outputChannel;
+}
+
+function workspaceRootFsPath(): string | undefined {
+    const folders = workspace.workspaceFolders;
+    if (!folders || folders.length === 0) return undefined;
+    return folders[0].uri.fsPath;
+}
+
+function resolveAgainstRoot(p: string): string | undefined {
+    if (path.isAbsolute(p)) return p;
+    const root = workspaceRootFsPath();
+    if (!root) return undefined;
+    return path.resolve(root, p);
+}
+
+function bundlerScriptPath(context: ExtensionContext): string {
+    return context.asAbsolutePath(path.join('scripts', 'bundler.mjs'));
+}
+
+async function runBundler(
+    context: ExtensionContext,
+    src: string,
+    out: string,
+    strip: boolean,
+): Promise<void> {
+    const oc = getOutput();
+    oc.show(true);
+    const script = bundlerScriptPath(context);
+    const args = [src, out];
+    if (strip) args.push('--strip');
+    oc.appendLine(`[bundler] node ${script} ${args.join(' ')}`);
+
+    return new Promise<void>((resolve, reject) => {
+        const child = fork(script, args, {
+            cwd: workspaceRootFsPath() ?? path.dirname(src),
+            stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+            silent: true,
+        });
+        child.stdout?.on('data', (d) => oc.append(d.toString()));
+        child.stderr?.on('data', (d) => oc.append(d.toString()));
+        child.on('exit', (code) => {
+            oc.appendLine(`[bundler] exit ${code}`);
+            if (code === 0) resolve();
+            else reject(new Error(`bundler exited with code ${code}`));
+        });
+        child.on('error', reject);
+    });
+}
+
+function readProjects(): ProjectConfig[] {
+    const cfg = workspace.getConfiguration('enma');
+    const list = cfg.get<ProjectConfig[]>('projects', []);
+    return Array.isArray(list) ? list : [];
+}
+
+function readBundlerSettings(): { src: string; out: string; strip: boolean } {
+    const cfg = workspace.getConfiguration('enma.bundler');
+    return {
+        src: cfg.get<string>('sourceDirectory', 'source') + '/main.em',
+        out: cfg.get<string>('outputFile', 'output/bundled.em'),
+        strip: cfg.get<boolean>('stripComments', true),
+    };
+}
+
+// --------------------------------------------------------------------------
+// Commands
+// --------------------------------------------------------------------------
+
+async function cmdBundle(context: ExtensionContext, forceStrip?: boolean): Promise<void> {
+    const settings = readBundlerSettings();
+    const src = resolveAgainstRoot(settings.src);
+    const out = resolveAgainstRoot(settings.out);
+    if (!src || !out) {
+        window.showErrorMessage('Enma: open a workspace folder first.');
+        return;
+    }
+    if (!fs.existsSync(src)) {
+        const pick = await window.showWarningMessage(
+            `Enma: source entry not found at ${src}. Pick a different file?`,
+            'Pick file', 'Cancel',
+        );
+        if (pick !== 'Pick file') return;
+        const chosen = await window.showOpenDialog({
+            canSelectFiles: true,
+            canSelectMany: false,
+            filters: { Enma: ['em'] },
+        });
+        if (!chosen || chosen.length === 0) return;
+        await runBundler(context, chosen[0].fsPath, out, forceStrip ?? settings.strip);
+        return;
+    }
+    await runBundler(context, src, out, forceStrip ?? settings.strip);
+}
+
+async function cmdBundleProject(context: ExtensionContext): Promise<void> {
+    const projects = readProjects();
+    if (projects.length === 0) {
+        window.showInformationMessage(
+            'Enma: no projects configured. Add `enma.projects` to your settings.',
+        );
+        return;
+    }
+    const pick = await window.showQuickPick(
+        projects.map(p => ({ label: p.name, description: `${p.src} → ${p.out}`, project: p })),
+        { placeHolder: 'Pick an Enma project to bundle' },
+    );
+    if (!pick) return;
+    const src = resolveAgainstRoot(pick.project.src);
+    const out = resolveAgainstRoot(pick.project.out);
+    if (!src || !out) return;
+    await runBundler(context, src, out, !!pick.project.strip);
+}
+
+async function cmdBundleAll(context: ExtensionContext): Promise<void> {
+    const projects = readProjects();
+    if (projects.length === 0) {
+        window.showInformationMessage(
+            'Enma: no projects configured. Add `enma.projects` to your settings.',
+        );
+        return;
+    }
+    for (const p of projects) {
+        const src = resolveAgainstRoot(p.src);
+        const out = resolveAgainstRoot(p.out);
+        if (!src || !out) continue;
+        try {
+            await runBundler(context, src, out, !!p.strip);
+        } catch (e) {
+            getOutput().appendLine(`[bundler] project '${p.name}' failed: ${(e as Error).message}`);
+        }
+    }
+}
+
+async function cmdInitProject(): Promise<void> {
+    const root = workspaceRootFsPath();
+    if (!root) {
+        window.showErrorMessage('Enma: open a workspace folder first.');
+        return;
+    }
+    const sourceDir = path.join(root, 'source');
+    const vscodeDir = path.join(root, '.vscode');
+    fs.mkdirSync(sourceDir, { recursive: true });
+    fs.mkdirSync(vscodeDir, { recursive: true });
+
+    const mainPath = path.join(sourceDir, 'main.em');
+    if (!fs.existsSync(mainPath)) {
+        fs.writeFileSync(mainPath, `// Enma entry — edit this file.\nvoid main() {\n}\n`, 'utf8');
+    }
+    const tasksPath = path.join(vscodeDir, 'tasks.json');
+    if (!fs.existsSync(tasksPath)) {
+        const tasksJson = {
+            version: '2.0.0',
+            tasks: [
+                {
+                    label: 'Enma: bundle',
+                    type: 'enma-bundle',
+                    src: 'source/main.em',
+                    out: 'output/bundled.em',
+                    strip: false,
+                    problemMatcher: [],
+                },
+            ],
+        };
+        fs.writeFileSync(tasksPath, JSON.stringify(tasksJson, null, 4) + '\n', 'utf8');
+    }
+    window.showInformationMessage('Enma: project scaffolded (source/main.em + .vscode/tasks.json).');
+    const doc = await workspace.openTextDocument(Uri.file(mainPath));
+    await window.showTextDocument(doc);
+}
+
+// --------------------------------------------------------------------------
+// Task provider
+// --------------------------------------------------------------------------
+
+class EnmaBundleTaskProvider implements TaskProvider {
+    constructor(private readonly context: ExtensionContext) {}
+
+    provideTasks(): Task[] {
+        return [];
+    }
+
+    resolveTask(task: Task): Task | undefined {
+        const def = task.definition as BundleTaskDefinition;
+        if (def.type !== 'enma-bundle') return undefined;
+        const src = resolveAgainstRoot(def.src) ?? def.src;
+        const out = resolveAgainstRoot(def.out) ?? def.out;
+        const script = bundlerScriptPath(this.context);
+        const args = [`"${src}"`, `"${out}"`];
+        if (def.strip) args.push('--strip');
+        const exec = new ShellExecution(`node "${script}" ${args.join(' ')}`);
+        return new Task(
+            def,
+            task.scope ?? TaskScope.Workspace,
+            task.name ?? `bundle ${path.basename(src)}`,
+            'enma',
+            exec,
+        );
+    }
+}
+
+// --------------------------------------------------------------------------
+// Activation entry
+// --------------------------------------------------------------------------
+
+export function registerBundler(context: ExtensionContext): void {
+    context.subscriptions.push(
+        commands.registerCommand('enma.bundle', () => cmdBundle(context)),
+        commands.registerCommand('enma.bundleStripped', () => cmdBundle(context, true)),
+        commands.registerCommand('enma.bundleProject', () => cmdBundleProject(context)),
+        commands.registerCommand('enma.bundleAll', () => cmdBundleAll(context)),
+        commands.registerCommand('enma.initProject', () => cmdInitProject()),
+        tasks.registerTaskProvider('enma-bundle', new EnmaBundleTaskProvider(context)),
+    );
+}

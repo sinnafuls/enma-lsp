@@ -1,0 +1,439 @@
+===============================================================================
+Enum declaration
+===============================================================================
+enum Color { Red, Green, Blue }
+-------------------------------------------------------------------------------
+(source_file
+  (enum_declaration
+    (identifier)
+    (enum_variant (identifier))
+    (enum_variant (identifier))
+    (enum_variant (identifier))))
+
+===============================================================================
+Delegate declaration
+===============================================================================
+delegate int32 BinOp(int32 a, int32 b);
+-------------------------------------------------------------------------------
+(source_file
+  (delegate_declaration
+    (type_name)
+    (identifier)
+    (parameter_list
+      (parameter (type_name) (identifier))
+      (parameter (type_name) (identifier)))))
+
+===============================================================================
+Interface declaration
+===============================================================================
+interface Drawable {
+    void draw();
+}
+-------------------------------------------------------------------------------
+(source_file
+  (interface_declaration
+    (identifier)
+    (method_declaration
+      (type_name)
+      (identifier)
+      (parameter_list))))
+
+===============================================================================
+Class with single inheritance
+===============================================================================
+class Entity : Drawable {
+    int32 hp;
+}
+-------------------------------------------------------------------------------
+(source_file
+  (class_declaration
+    (identifier)
+    (base_list (type_name (identifier)))
+    (field_declaration (type_name) (identifier))))
+
+===============================================================================
+Struct with annotations
+===============================================================================
+[[reflect]] [[serialize]]
+struct Header {
+    uint8 kind;
+    uint32 size;
+}
+-------------------------------------------------------------------------------
+(source_file
+  (struct_declaration
+    (annotation_list
+      (annotation (identifier))
+      (annotation (identifier)))
+    (identifier)
+    (field_declaration (type_name) (identifier))
+    (field_declaration (type_name) (identifier))))
+
+===============================================================================
+Annotation with argument
+===============================================================================
+[[align(16)]]
+struct Vec { float32 x; float32 y; }
+-------------------------------------------------------------------------------
+(source_file
+  (struct_declaration
+    (annotation_list
+      (annotation (identifier) (number_literal)))
+    (identifier)
+    (field_declaration (type_name) (identifier))
+    (field_declaration (type_name) (identifier))))
+
+===============================================================================
+Extern declaration with dll annotation
+===============================================================================
+[[dll("user32.dll")]]
+extern int32 MessageBoxA(int64 hWnd, string text);
+-------------------------------------------------------------------------------
+(source_file
+  (extern_declaration
+    (annotation_list
+      (annotation (identifier) (string_literal)))
+    (type_name)
+    (identifier)
+    (parameter_list
+      (parameter (type_name) (identifier))
+      (parameter (type_name) (identifier)))))
+
+===============================================================================
+Template function
+===============================================================================
+template<typename T>
+T max(T a, T b) {
+    return a > b ? a : b;
+}
+-------------------------------------------------------------------------------
+(source_file
+  (template_declaration
+    (template_parameter (identifier))
+    (function_declaration
+      (type_name (identifier))
+      (identifier)
+      (parameter_list
+        (parameter (type_name (identifier)) (identifier))
+        (parameter (type_name (identifier)) (identifier)))
+      (block
+        (return_statement
+          (ternary_expression
+            (binary_expression
+              (identifier_expression (identifier))
+              (identifier_expression (identifier)))
+            (identifier_expression (identifier))
+            (identifier_expression (identifier))))))))
+
+===============================================================================
+Namespace with function and struct
+===============================================================================
+namespace geom {
+    int32 square(int32 x) { return x * x; }
+    struct Point { int32 x; int32 y; }
+}
+-------------------------------------------------------------------------------
+(source_file
+  (namespace_declaration
+    (identifier)
+    (function_declaration
+      (type_name)
+      (identifier)
+      (parameter_list (parameter (type_name) (identifier)))
+      (block
+        (return_statement
+          (binary_expression
+            (identifier_expression (identifier))
+            (identifier_expression (identifier))))))
+    (struct_declaration
+      (identifier)
+      (field_declaration (type_name) (identifier))
+      (field_declaration (type_name) (identifier)))))
+
+===============================================================================
+F-string with §A2 boundary tokens — simple
+===============================================================================
+void f() { println(f"caught {e}"); }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (expression_statement
+        (call_expression
+          (identifier_expression (identifier))
+          (fstring_literal
+            (fstring_start)
+            (fstring_text)
+            (fstring_expr_open)
+            (identifier_expression (identifier))
+            (fstring_expr_close)
+            (fstring_end)))))))
+
+===============================================================================
+F-string with two interpolations (draw method style)
+===============================================================================
+void f() { println(f"drawing {name} hp={hp}"); }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (expression_statement
+        (call_expression
+          (identifier_expression (identifier))
+          (fstring_literal
+            (fstring_start)
+            (fstring_text)
+            (fstring_expr_open)
+            (identifier_expression (identifier))
+            (fstring_expr_close)
+            (fstring_text)
+            (fstring_expr_open)
+            (identifier_expression (identifier))
+            (fstring_expr_close)
+            (fstring_end)))))))
+
+===============================================================================
+Match expression
+===============================================================================
+int32 r = match (sum) {
+    0 => 100,
+    1 => 200,
+    _ => 0
+};
+-------------------------------------------------------------------------------
+(source_file
+  (variable_declaration
+    (type_name)
+    (identifier)
+    (match_expression
+      (identifier_expression (identifier))
+      (match_arm (number_literal) (number_literal))
+      (match_arm (number_literal) (number_literal))
+      (match_arm (wildcard_pattern) (number_literal)))))
+
+===============================================================================
+Defer statement
+===============================================================================
+void f() {
+    int64 h = open_resource();
+    defer { close_resource(h); }
+}
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (variable_declaration
+        (type_name)
+        (identifier)
+        (call_expression (identifier_expression (identifier))))
+      (defer_statement
+        (block
+          (expression_statement
+            (call_expression
+              (identifier_expression (identifier))
+              (identifier_expression (identifier)))))))))
+
+===============================================================================
+Pointer member access vs value member access
+===============================================================================
+void f() {
+    Entity* p = new Entity("hero", 100);
+    p->hp = 50;
+    Entity e = *p;
+    e.hp = 50;
+    delete p;
+}
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (variable_declaration
+        (type_name (pointer_type (type_name (identifier))))
+        (identifier)
+        (new_expression
+          (type_name (identifier))
+          (string_literal)
+          (number_literal)))
+      (expression_statement
+        (assignment_expression
+          (pointer_member_expression
+            (identifier_expression (identifier))
+            (identifier))
+          (number_literal)))
+      (variable_declaration
+        (type_name (identifier))
+        (identifier)
+        (unary_expression (identifier_expression (identifier))))
+      (expression_statement
+        (assignment_expression
+          (member_expression
+            (identifier_expression (identifier))
+            (identifier))
+          (number_literal)))
+      (expression_statement
+        (delete_expression (identifier_expression (identifier)))))))
+
+===============================================================================
+Lambda bracket form
+===============================================================================
+void f() {
+    BinOp add = [](int32 a, int32 b) -> int32 { return a + b; };
+}
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (variable_declaration
+        (type_name (identifier))
+        (identifier)
+        (lambda_bracket
+          (parameter_list
+            (parameter (type_name) (identifier))
+            (parameter (type_name) (identifier)))
+          (type_name)
+          (block
+            (return_statement
+              (binary_expression
+                (identifier_expression (identifier))
+                (identifier_expression (identifier))))))))))
+
+===============================================================================
+Function reference
+===============================================================================
+int64 fn_ptr = @max;
+-------------------------------------------------------------------------------
+(source_file
+  (variable_declaration
+    (type_name)
+    (identifier)
+    (function_reference (identifier))))
+
+===============================================================================
+Designated initializer
+===============================================================================
+geom::Point origin = { .x = 0, .y = 0 };
+-------------------------------------------------------------------------------
+(source_file
+  (variable_declaration
+    (type_name
+      (qualified_type (identifier) (identifier)))
+    (identifier)
+    (designated_initializer_list
+      (designated_initializer (identifier) (number_literal))
+      (designated_initializer (identifier) (number_literal)))))
+
+===============================================================================
+Variadic function with intrinsics
+===============================================================================
+int64 sum_all(...) {
+    int64 s = 0;
+    while (s < __va_count) {
+        s = s + __va_arg(s);
+    }
+    return s;
+}
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list (variadic_param))
+    (block
+      (variable_declaration (type_name) (identifier) (number_literal))
+      (while_statement
+        (binary_expression
+          (identifier_expression (identifier))
+          (intrinsic_expression))
+        (block
+          (expression_statement
+            (assignment_expression
+              (identifier_expression (identifier))
+              (binary_expression
+                (identifier_expression (identifier))
+                (intrinsic_expression
+                  (identifier_expression (identifier))))))))
+      (return_statement (identifier_expression (identifier))))))
+
+===============================================================================
+Preprocessor directives
+===============================================================================
+#include "core.em"
+#define MAX_HP 100
+#ifdef DEBUG
+#define LOG(m) println(m)
+#endif
+-------------------------------------------------------------------------------
+(source_file
+  (preprocessor_directive)
+  (preprocessor_directive)
+  (preprocessor_directive)
+  (preprocessor_directive)
+  (preprocessor_directive))
+
+===============================================================================
+Range-based for loop
+===============================================================================
+void f() {
+    for (int32 v : nums) {
+        v = v + 1;
+    }
+}
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (foreach_statement
+        (type_name)
+        (identifier)
+        (identifier_expression (identifier))
+        (block
+          (expression_statement
+            (assignment_expression
+              (identifier_expression (identifier))
+              (binary_expression
+                (identifier_expression (identifier))
+                (number_literal)))))))))
+
+===============================================================================
+Try / catch / throw
+===============================================================================
+void f() {
+    try {
+        throw -1;
+    } catch (int32 e) {
+        return;
+    }
+}
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (try_statement
+        (block
+          (throw_statement
+            (unary_expression (number_literal))))
+        (catch_clause
+          (type_name)
+          (identifier)
+          (block (return_statement)))))))

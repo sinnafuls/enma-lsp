@@ -1,0 +1,24 @@
+{
+  "name": "tree-sitter-enma",
+  "version": "0.0.1",
+  "description": "Tree-sitter grammar for the Enma scripting language (M0.5 spike)",
+  "main": "bindings/node",
+  "scripts": {
+    "generate": "tree-sitter generate",
+    "parse": "tree-sitter parse",
+    "test": "tree-sitter test"
+  },
+  "dependencies": {
+    "nan": "^2.20.0"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.25.0"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.enma",
+      "file-types": ["em"],
+      "highlights": "queries/highlights.scm"
+    }
+  ]
+}

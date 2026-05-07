@@ -1,0 +1,147 @@
+===============================================================================
+F-string depth 2 — nested f-string in interpolation
+===============================================================================
+void f() { string s = f"a={f"b={x}"}"; }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (variable_declaration
+        (type_name)
+        (identifier)
+        (fstring_literal
+          (fstring_start)
+          (fstring_text)
+          (fstring_expr_open)
+          (fstring_literal
+            (fstring_start)
+            (fstring_text)
+            (fstring_expr_open)
+            (identifier_expression (identifier))
+            (fstring_expr_close)
+            (fstring_end))
+          (fstring_expr_close)
+          (fstring_end))))))
+
+===============================================================================
+F-string depth 3 — triple nested f-string
+===============================================================================
+void f() { string s = f"x={f"y={f"z={n}"}"}"; }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (variable_declaration
+        (type_name)
+        (identifier)
+        (fstring_literal
+          (fstring_start)
+          (fstring_text)
+          (fstring_expr_open)
+          (fstring_literal
+            (fstring_start)
+            (fstring_text)
+            (fstring_expr_open)
+            (fstring_literal
+              (fstring_start)
+              (fstring_text)
+              (fstring_expr_open)
+              (identifier_expression (identifier))
+              (fstring_expr_close)
+              (fstring_end))
+            (fstring_expr_close)
+            (fstring_end))
+          (fstring_expr_close)
+          (fstring_end))))))
+
+===============================================================================
+F-string depth 2 with index expression inside inner interpolation
+===============================================================================
+void f() { string s = f"sum={a + nums[0]}"; }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (variable_declaration
+        (type_name)
+        (identifier)
+        (fstring_literal
+          (fstring_start)
+          (fstring_text)
+          (fstring_expr_open)
+          (binary_expression
+            (identifier_expression (identifier))
+            (index_expression
+              (identifier_expression (identifier))
+              (number_literal)))
+          (fstring_expr_close)
+          (fstring_end))))))
+
+===============================================================================
+F-string with complex binary expression
+===============================================================================
+void f() { println(f"sum + 1 = {nums[0] + nums[1] * 2}"); }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (expression_statement
+        (call_expression
+          (identifier_expression (identifier))
+          (fstring_literal
+            (fstring_start)
+            (fstring_text)
+            (fstring_expr_open)
+            (binary_expression
+              (index_expression
+                (identifier_expression (identifier))
+                (number_literal))
+              (binary_expression
+                (index_expression
+                  (identifier_expression (identifier))
+                  (number_literal))
+                (number_literal)))
+            (fstring_expr_close)
+            (fstring_end)))))))
+
+===============================================================================
+F-string with member access expressions
+===============================================================================
+void f() { println(f"drawing {this.name} hp={this.hp}"); }
+-------------------------------------------------------------------------------
+(source_file
+  (function_declaration
+    (type_name)
+    (identifier)
+    (parameter_list)
+    (block
+      (expression_statement
+        (call_expression
+          (identifier_expression (identifier))
+          (fstring_literal
+            (fstring_start)
+            (fstring_text)
+            (fstring_expr_open)
+            (member_expression
+              (this_expression)
+              (identifier))
+            (fstring_expr_close)
+            (fstring_text)
+            (fstring_expr_open)
+            (member_expression
+              (this_expression)
+              (identifier))
+            (fstring_expr_close)
+            (fstring_end)))))))

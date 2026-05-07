@@ -1,0 +1,635 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Enma",
+  "scopeName": "source.enma",
+  "fileTypes": ["em"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#preprocessor" },
+    { "include": "#annotations" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#class-declaration" },
+    { "include": "#struct-declaration" },
+    { "include": "#interface-declaration" },
+    { "include": "#enum-declaration" },
+    { "include": "#namespace-declaration" },
+    { "include": "#mixin-declaration" },
+    { "include": "#using-declaration" },
+    { "include": "#typedef-declaration" },
+    { "include": "#template-declaration" },
+    { "include": "#delegate-declaration" },
+    { "include": "#keywords" },
+    { "include": "#constants" },
+    { "include": "#types" },
+    { "include": "#intrinsics" },
+    { "include": "#namespace-access" },
+    { "include": "#member-access" },
+    { "include": "#function-call" },
+    { "include": "#function-reference" },
+    { "include": "#operators" },
+    { "include": "#block" },
+    { "include": "#parens" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.enma",
+          "begin": "//",
+          "end": "$",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.comment.enma" }
+          }
+        },
+        {
+          "name": "comment.block.enma",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.comment.begin.enma" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.comment.end.enma" }
+          }
+        }
+      ]
+    },
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.include.enma",
+          "begin": "^\\s*(#)\\s*(include)\\b",
+          "end": "(?=//)|$",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.directive.enma" },
+            "2": { "name": "keyword.control.directive.include.enma" }
+          },
+          "patterns": [
+            { "include": "#strings" },
+            { "include": "#comments" }
+          ]
+        },
+        {
+          "name": "meta.preprocessor.define.enma",
+          "begin": "^\\s*(#)\\s*(define|undef)\\b\\s*([A-Za-z_][A-Za-z0-9_]*)?",
+          "end": "(?<!\\\\)$",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.directive.enma" },
+            "2": { "name": "keyword.control.directive.define.enma" },
+            "3": { "name": "entity.name.macro.enma" }
+          },
+          "patterns": [
+            { "include": "#comments" },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#constants" },
+            { "include": "#types" },
+            { "include": "#keywords" },
+            { "include": "#operators" }
+          ]
+        },
+        {
+          "name": "meta.preprocessor.conditional.enma",
+          "match": "^\\s*(#)\\s*(ifdef|ifndef|if|else|elif|endif|pragma)\\b",
+          "captures": {
+            "1": { "name": "punctuation.definition.directive.enma" },
+            "2": { "name": "keyword.control.directive.conditional.enma" }
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "patterns": [
+        {
+          "name": "meta.annotation.enma",
+          "begin": "\\[\\[",
+          "end": "\\]\\]",
+          "beginCaptures": {
+            "0": { "name": "punctuation.definition.annotation.begin.enma" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.definition.annotation.end.enma" }
+          },
+          "patterns": [
+            {
+              "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
+              "name": "entity.name.tag.annotation.enma"
+            },
+            { "include": "#strings" },
+            { "include": "#numbers" },
+            { "include": "#constants" },
+            {
+              "name": "punctuation.separator.annotation.enma",
+              "match": "[(),]"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "include": "#f-string" },
+        { "include": "#regular-string" },
+        { "include": "#char-literal" }
+      ]
+    },
+    "f-string": {
+      "name": "string.quoted.double.interpolated.enma",
+      "begin": "(f)(\")",
+      "end": "\"",
+      "beginCaptures": {
+        "1": { "name": "storage.type.string.fstring.enma" },
+        "2": { "name": "punctuation.definition.string.begin.enma" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.enma" }
+      },
+      "patterns": [
+        { "include": "#string-escape" },
+        {
+          "name": "meta.embedded.expression.enma",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": { "name": "punctuation.section.embedded.begin.enma" }
+          },
+          "endCaptures": {
+            "0": { "name": "punctuation.section.embedded.end.enma" }
+          },
+          "patterns": [
+            { "include": "$self" }
+          ]
+        }
+      ]
+    },
+    "regular-string": {
+      "name": "string.quoted.double.enma",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": {
+        "0": { "name": "punctuation.definition.string.begin.enma" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.definition.string.end.enma" }
+      },
+      "patterns": [
+        { "include": "#string-escape" }
+      ]
+    },
+    "char-literal": {
+      "name": "string.quoted.single.enma",
+      "match": "'(\\\\(x[0-9A-Fa-f]+|.)|[^'\\\\])'",
+      "captures": {
+        "1": { "name": "constant.character.escape.enma" }
+      }
+    },
+    "string-escape": {
+      "name": "constant.character.escape.enma",
+      "match": "\\\\(x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{1,8}|.)"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.enma",
+          "match": "\\b(0[xX][0-9a-fA-F]+)(_[A-Za-z][A-Za-z0-9_]*)?\\b",
+          "captures": {
+            "2": { "name": "storage.type.userdefined.literal.enma" }
+          }
+        },
+        {
+          "name": "constant.numeric.float.enma",
+          "match": "\\b([0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?)([fF])?(_[A-Za-z][A-Za-z0-9_]*)?\\b",
+          "captures": {
+            "2": { "name": "storage.type.suffix.float32.enma" },
+            "3": { "name": "storage.type.userdefined.literal.enma" }
+          }
+        },
+        {
+          "name": "constant.numeric.float.enma",
+          "match": "\\b([0-9]+[eE][+-]?[0-9]+)([fF])?(_[A-Za-z][A-Za-z0-9_]*)?\\b",
+          "captures": {
+            "2": { "name": "storage.type.suffix.float32.enma" },
+            "3": { "name": "storage.type.userdefined.literal.enma" }
+          }
+        },
+        {
+          "name": "constant.numeric.integer.enma",
+          "match": "\\b([0-9]+)([fF])?(_[A-Za-z][A-Za-z0-9_]*)?\\b",
+          "captures": {
+            "2": { "name": "storage.type.suffix.float32.enma" },
+            "3": { "name": "storage.type.userdefined.literal.enma" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.flow.enma",
+          "match": "\\b(if|else|for|while|do|switch|match|case|default|break|continue|return|goto|try|catch|throw|defer|yield)\\b"
+        },
+        {
+          "name": "storage.type.enma",
+          "match": "\\b(class|struct|interface|enum|namespace|using|template|typedef|decltype|mixin|import|extern|delegate|property|coroutine|typename)\\b"
+        },
+        {
+          "name": "keyword.other.operator.overload.enma",
+          "match": "\\b(operator)\\b"
+        },
+        {
+          "name": "storage.modifier.enma",
+          "match": "\\b(static|const|constexpr|override|public|private|nullable|out|inline|auto|volatile|get|set)\\b"
+        },
+        {
+          "name": "keyword.operator.new.enma",
+          "match": "\\b(new|delete|sizeof|offsetof|static_assert)\\b"
+        },
+        {
+          "name": "keyword.operator.cast.enma",
+          "match": "\\b(cast|static_cast|reinterpret_cast|const_cast)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.true.enma",
+          "match": "\\btrue\\b"
+        },
+        {
+          "name": "constant.language.boolean.false.enma",
+          "match": "\\bfalse\\b"
+        },
+        {
+          "name": "constant.language.null.enma",
+          "match": "\\b(null|nullptr)\\b"
+        },
+        {
+          "name": "variable.language.this.enma",
+          "match": "\\bthis\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.enma",
+          "match": "\\b(int8|int16|int32|int64|uint8|uint16|uint32|uint64|aint8|aint16|aint32|aint64|float32|float64|float|double|string|wstring|char|wchar|bool|void|size_t)\\b"
+        },
+        {
+          "name": "support.type.builtin.enma",
+          "match": "\\b(array|map|hash_set|sorted_map|variant|vec2|vec3|vec4|coroutine_t|atomic_int32|atomic_int64|mutex|cond_var|lock_guard|file_t|regex|json_value)\\b"
+        }
+      ]
+    },
+    "intrinsics": {
+      "patterns": [
+        {
+          "name": "support.function.intrinsic.enma",
+          "match": "\\b(__[A-Za-z_][A-Za-z0-9_]*)\\b"
+        }
+      ]
+    },
+    "class-declaration": {
+      "begin": "\\b(class)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "end": "(?=[{;])",
+      "beginCaptures": {
+        "1": { "name": "storage.type.class.enma" },
+        "2": { "name": "entity.name.type.class.enma" }
+      },
+      "patterns": [
+        { "include": "#inheritance-list" }
+      ]
+    },
+    "struct-declaration": {
+      "begin": "\\b(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "end": "(?=[{;])",
+      "beginCaptures": {
+        "1": { "name": "storage.type.struct.enma" },
+        "2": { "name": "entity.name.type.struct.enma" }
+      },
+      "patterns": [
+        { "include": "#inheritance-list" }
+      ]
+    },
+    "interface-declaration": {
+      "begin": "\\b(interface)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "end": "(?=[{;])",
+      "beginCaptures": {
+        "1": { "name": "storage.type.interface.enma" },
+        "2": { "name": "entity.name.type.interface.enma" }
+      },
+      "patterns": [
+        { "include": "#inheritance-list" }
+      ]
+    },
+    "enum-declaration": {
+      "match": "\\b(enum)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.type.enum.enma" },
+        "2": { "name": "entity.name.type.enum.enma" }
+      }
+    },
+    "namespace-declaration": {
+      "match": "\\b(namespace)\\s+([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)",
+      "captures": {
+        "1": { "name": "storage.type.namespace.enma" },
+        "2": { "name": "entity.name.namespace.enma" }
+      }
+    },
+    "mixin-declaration": {
+      "match": "\\b(mixin)\\b",
+      "captures": {
+        "1": { "name": "storage.type.mixin.enma" }
+      }
+    },
+    "using-declaration": {
+      "match": "\\b(using)\\s+(namespace\\s+)?([A-Za-z_][A-Za-z0-9_]*(?:::[A-Za-z_][A-Za-z0-9_]*)*)",
+      "captures": {
+        "1": { "name": "storage.type.using.enma" },
+        "2": { "name": "storage.type.namespace.enma" },
+        "3": { "name": "entity.name.namespace.enma" }
+      }
+    },
+    "typedef-declaration": {
+      "match": "\\b(typedef)\\b",
+      "captures": {
+        "1": { "name": "storage.type.typedef.enma" }
+      }
+    },
+    "template-declaration": {
+      "begin": "\\b(template)\\s*(<)",
+      "end": "(>)",
+      "beginCaptures": {
+        "1": { "name": "storage.type.template.enma" },
+        "2": { "name": "punctuation.definition.template.begin.enma" }
+      },
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.template.end.enma" }
+      },
+      "patterns": [
+        {
+          "name": "storage.type.typename.enma",
+          "match": "\\b(typename|class)\\b"
+        },
+        { "include": "#types" },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "captures": {
+            "1": { "name": "entity.name.type.template.enma" }
+          }
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.template.enma"
+        }
+      ]
+    },
+    "delegate-declaration": {
+      "match": "\\b(delegate)\\s+([A-Za-z_][A-Za-z0-9_]*\\s+)?([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "storage.type.delegate.enma" },
+        "3": { "name": "entity.name.type.delegate.enma" }
+      }
+    },
+    "inheritance-list": {
+      "patterns": [
+        {
+          "match": ":",
+          "name": "punctuation.separator.inheritance.enma"
+        },
+        {
+          "match": "\\b(public|private|protected|virtual)\\b",
+          "name": "storage.modifier.access.enma"
+        },
+        { "include": "#namespace-access" },
+        { "include": "#types" },
+        {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\b",
+          "name": "entity.other.inherited-class.enma"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.separator.comma.enma"
+        },
+        {
+          "match": "[<>]",
+          "name": "punctuation.definition.template.enma"
+        },
+        { "include": "#comments" }
+      ]
+    },
+    "namespace-access": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(::)",
+      "captures": {
+        "1": { "name": "entity.name.namespace.enma" },
+        "2": { "name": "keyword.operator.scope.enma" }
+      }
+    },
+    "member-access": {
+      "patterns": [
+        {
+          "match": "(->)\\s*(?!(?:int8|int16|int32|int64|uint8|uint16|uint32|uint64|aint8|aint16|aint32|aint64|float32|float64|float|double|string|wstring|char|wchar|bool|void|size_t|array|map|hash_set|sorted_map|variant|vec2|vec3|vec4|coroutine_t|atomic_int32|atomic_int64|mutex|cond_var|lock_guard|file_t|regex|json_value|auto|const)\\b)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "keyword.operator.arrow.enma" },
+            "2": { "name": "entity.name.function.member.enma" }
+          }
+        },
+        {
+          "match": "(\\.)\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "punctuation.accessor.dot.enma" },
+            "2": { "name": "entity.name.function.member.enma" }
+          }
+        },
+        {
+          "match": "(->)\\s*(?!(?:int8|int16|int32|int64|uint8|uint16|uint32|uint64|aint8|aint16|aint32|aint64|float32|float64|float|double|string|wstring|char|wchar|bool|void|size_t|array|map|hash_set|sorted_map|variant|vec2|vec3|vec4|coroutine_t|atomic_int32|atomic_int64|mutex|cond_var|lock_guard|file_t|regex|json_value|auto|const)\\b)([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.operator.arrow.enma" },
+            "2": { "name": "variable.other.property.enma" }
+          }
+        },
+        {
+          "match": "(\\.)\\s*([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "punctuation.accessor.dot.enma" },
+            "2": { "name": "variable.other.property.enma" }
+          }
+        }
+      ]
+    },
+    "function-call": {
+      "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+      "captures": {
+        "1": { "name": "entity.name.function.enma" }
+      }
+    },
+    "function-reference": {
+      "match": "(@)([A-Za-z_][A-Za-z0-9_]*)",
+      "captures": {
+        "1": { "name": "keyword.operator.function-reference.enma" },
+        "2": { "name": "entity.name.function.reference.enma" }
+      }
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arrow.enma",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.scope.enma",
+          "match": "::"
+        },
+        {
+          "name": "keyword.operator.lambda.enma",
+          "match": "=>"
+        },
+        {
+          "name": "keyword.operator.null-coalesce.enma",
+          "match": "\\?\\?"
+        },
+        {
+          "name": "keyword.operator.ellipsis.enma",
+          "match": "\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.comparison.enma",
+          "match": "(==|!=|<=|>=)"
+        },
+        {
+          "name": "keyword.operator.assignment.compound.enma",
+          "match": "(\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|<<=|>>=)"
+        },
+        {
+          "name": "keyword.operator.logical.enma",
+          "match": "(&&|\\|\\||!(?!=))"
+        },
+        {
+          "name": "keyword.operator.bitwise.enma",
+          "match": "(<<|>>|\\^|~|&(?!&)|\\|(?!\\|))"
+        },
+        {
+          "name": "keyword.operator.assignment.enma",
+          "match": "="
+        },
+        {
+          "name": "keyword.operator.comparison.enma",
+          "match": "[<>]"
+        },
+        {
+          "name": "keyword.operator.increment.enma",
+          "match": "(\\+\\+|--)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.enma",
+          "match": "[+\\-*/%]"
+        },
+        {
+          "name": "keyword.operator.ternary.enma",
+          "match": "[?:]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.statement.enma",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.comma.enma",
+          "match": ","
+        },
+        {
+          "name": "punctuation.section.block.begin.enma",
+          "match": "\\{"
+        },
+        {
+          "name": "punctuation.section.block.end.enma",
+          "match": "\\}"
+        },
+        {
+          "name": "punctuation.section.parens.begin.enma",
+          "match": "\\("
+        },
+        {
+          "name": "punctuation.section.parens.end.enma",
+          "match": "\\)"
+        },
+        {
+          "name": "punctuation.section.brackets.begin.enma",
+          "match": "\\["
+        },
+        {
+          "name": "punctuation.section.brackets.end.enma",
+          "match": "\\]"
+        }
+      ]
+    },
+    "block": {
+      "begin": "\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.block.begin.enma" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.block.end.enma" }
+      },
+      "patterns": [
+        { "include": "#variable-declaration-primitive" },
+        { "include": "#variable-declaration-builtin" },
+        { "include": "$self" },
+        { "include": "#identifier-fallback" }
+      ]
+    },
+    "parens": {
+      "begin": "\\(",
+      "end": "\\)",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.parens.begin.enma" }
+      },
+      "endCaptures": {
+        "0": { "name": "punctuation.section.parens.end.enma" }
+      },
+      "patterns": [
+        { "include": "#variable-declaration-primitive" },
+        { "include": "#variable-declaration-builtin" },
+        { "include": "$self" },
+        { "include": "#identifier-fallback" }
+      ]
+    },
+    "identifier-fallback": {
+      "patterns": [
+        {
+          "match": "\\b([A-Z][a-z][A-Za-z0-9_]*)\\b",
+          "name": "entity.name.type.enma"
+        },
+        {
+          "match": "\\b([A-Z])\\b",
+          "name": "entity.name.type.template.enma"
+        },
+        {
+          "match": "\\b([a-z_][A-Za-z0-9_]*)\\b",
+          "name": "variable.other.readwrite.enma"
+        }
+      ]
+    },
+    "variable-declaration-primitive": {
+      "match": "\\b(int8|int16|int32|int64|uint8|uint16|uint32|uint64|aint8|aint16|aint32|aint64|float32|float64|float|double|string|wstring|char|wchar|bool|void|size_t|auto)\\b((?:\\s*[*&]|\\[\\])*\\s+)([A-Za-z_][A-Za-z0-9_]*)\\b(?!\\s*\\()",
+      "captures": {
+        "1": { "name": "support.type.primitive.enma" },
+        "3": { "name": "variable.other.declaration.enma" }
+      }
+    },
+    "variable-declaration-builtin": {
+      "match": "\\b(array|map|hash_set|sorted_map|variant|vec2|vec3|vec4|coroutine_t|atomic_int32|atomic_int64|mutex|cond_var|lock_guard|file_t|regex|json_value)\\b((?:\\s*(?:<(?:[^<>]|<(?:[^<>]|<[^<>]*>)*>)*>|[*&])|\\[\\])*\\s+)([A-Za-z_][A-Za-z0-9_]*)\\b(?!\\s*\\()",
+      "captures": {
+        "1": { "name": "support.type.builtin.enma" },
+        "3": { "name": "variable.other.declaration.enma" }
+      }
+    }
+  }
+}

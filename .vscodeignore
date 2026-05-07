@@ -1,0 +1,70 @@
+# --- Dev/meta directories (root and nested) ---
+.vscode/**
+.claude/**
+.omc/**
+**/.omc/**
+.github/**
+.git/**
+.gitignore
+
+# --- Large unused subtrees ---
+spike/**
+pcx-extended-api/**
+example/**
+docs/**
+scripts/**
+tools/**
+
+# --- Source files (only dist/ ships) ---
+server/src/**
+server/test/**
+server/out/**
+server/node_modules/**
+server/tsconfig.json
+server/tsconfig*.json
+server/tsconfig.tsbuildinfo
+server/.eslintrc*
+server/.mocharc*
+server/bnf.txt
+
+client/src/**
+client/out/**
+client/node_modules/**
+client/tsconfig.json
+client/tsconfig*.json
+client/tsconfig.tsbuildinfo
+client/.eslintrc*
+
+# --- Root node_modules and build artifacts ---
+node_modules/**
+package-lock.json
+
+# --- Source maps, TypeScript sources (defense in depth) ---
+**/*.map
+**/*.ts
+
+# --- Build configs at root ---
+tsconfig.json
+tsconfig*.json
+esbuild.config.mjs
+**/.eslintrc*
+**/.mocharc*
+
+# --- Misc repo files ---
+samples/**
+progress.txt
+prd.json
+smoke-test.js
+smoke-providers.js
+test-providers.js
+test-mock-vscode.js
+fake-vscode-marker.js
+ship.bat
+ship.sh
+ship_source.bat
+VSCODE-PLUGIN-WORKSPACE.md
+shipped/**
+ship_source/**
+
+# --- Already-packaged .vsix files ---
+*.vsix

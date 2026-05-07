@@ -1,0 +1,27 @@
+{
+  "name": "enma-lsp",
+  "description": "Enma Language Server (LSP) — standalone CLI and VSCode language server.",
+  "version": "1.0.0",
+  "license": "MIT",
+  "bin": {
+    "enma-lsp": "./dist/server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.0.0",
+    "mocha": "^10.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  },
+  "scripts": {
+    "test": "mocha",
+    "test:tokenizer": "mocha --require ts-node/register 'test/unit/tokenizer/**/*.test.ts'"
+  }
+}

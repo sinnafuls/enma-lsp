@@ -1,0 +1,367 @@
+{
+  "name": "enma-language",
+  "displayName": "Enma Language",
+  "description": "Syntax highlighting, snippets, hover docs, completion, signature help, and full LSP services for the Enma scripting language (.em).",
+  "version": "1.0.0",
+  "publisher": "sin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sin/enma-lsp"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets"
+  ],
+  "main": "./client/dist/extension.js",
+  "activationEvents": [
+    "onLanguage:enma",
+    "onCommand:enma.bundle",
+    "onCommand:enma.bundleStripped",
+    "onCommand:enma.bundleProject",
+    "onCommand:enma.bundleAll",
+    "onCommand:enma.initProject"
+  ],
+  "keywords": [
+    "enma",
+    "scripting",
+    "lsp",
+    "language-server"
+  ],
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "enma",
+        "aliases": [
+          "Enma",
+          "enma"
+        ],
+        "extensions": [
+          ".em"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "enma-binary",
+        "aliases": [
+          "Enma Binary"
+        ],
+        "extensions": [
+          ".emb"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "enma",
+        "scopeName": "source.enma",
+        "path": "./syntaxes/enma.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "enma",
+        "path": "./snippets/enma.code-snippets"
+      },
+      {
+        "language": "enma",
+        "path": "./snippets/stdlib.code-snippets"
+      }
+    ],
+    "commands": [
+      {
+        "command": "enma.bundle",
+        "title": "Bundle current project",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.bundleStripped",
+        "title": "Bundle current project (strip comments)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.bundleProject",
+        "title": "Bundle a configured project",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.bundleAll",
+        "title": "Bundle all configured projects",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.initProject",
+        "title": "Initialize Enma project (source + tasks.json)",
+        "category": "Enma"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "enma.bundle",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "resourceExtname == .em"
+      },
+      {
+        "command": "enma.bundleStripped",
+        "key": "ctrl+alt+shift+b",
+        "mac": "cmd+alt+shift+b",
+        "when": "resourceExtname == .em"
+      }
+    ],
+    "taskDefinitions": [
+      {
+        "type": "enma-bundle",
+        "required": ["src", "out"],
+        "properties": {
+          "src": {
+            "type": "string",
+            "description": "Entry .em file (workspace-relative or absolute)."
+          },
+          "out": {
+            "type": "string",
+            "description": "Output bundled .em path (workspace-relative or absolute)."
+          },
+          "strip": {
+            "type": "boolean",
+            "default": false,
+            "description": "Strip line and block comments from the bundled output."
+          }
+        }
+      }
+    ],
+    "configurationDefaults": {
+      "editor.semanticHighlighting.enabled": true,
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": [
+              "variable.other.declaration.enma",
+              "variable.other.readwrite.enma"
+            ],
+            "settings": { "foreground": "#9CDCFE" }
+          },
+          {
+            "scope": "variable.other.property.enma",
+            "settings": { "foreground": "#9CDCFE" }
+          },
+          {
+            "scope": [
+              "entity.name.type.enma",
+              "entity.name.type.template.enma",
+              "entity.name.type.class.enma",
+              "entity.name.type.struct.enma",
+              "entity.name.type.interface.enma",
+              "entity.name.type.enum.enma",
+              "entity.name.type.delegate.enma",
+              "entity.other.inherited-class.enma"
+            ],
+            "settings": { "foreground": "#4EC9B0" }
+          },
+          {
+            "scope": "entity.name.function.enma",
+            "settings": { "foreground": "#DCDCAA" }
+          },
+          {
+            "scope": "entity.name.function.member.enma",
+            "settings": { "foreground": "#DCDCAA" }
+          },
+          {
+            "scope": "support.function.intrinsic.enma",
+            "settings": { "foreground": "#DCDCAA" }
+          },
+          {
+            "scope": [
+              "string.quoted.double.enma",
+              "string.quoted.single.enma",
+              "string.quoted.double.interpolated.enma"
+            ],
+            "settings": { "foreground": "#D69D85" }
+          },
+          {
+            "scope": "entity.name.namespace.enma",
+            "settings": { "foreground": "#D4D4D4" }
+          }
+        ]
+      },
+      "editor.semanticTokenColorCustomizations": {
+        "enabled": true,
+        "rules": {
+          "variable.global:enma":  "#D4D4D4",
+          "function.global:enma":  "#DCDCAA",
+          "namespace.global:enma": "#D4D4D4",
+          "class.global:enma":     "#4EC9B0",
+          "enum.global:enma":      "#4EC9B0"
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Enma",
+      "properties": {
+        "enma.indexCache.maxClosedFiles": {
+          "type": "number",
+          "default": 300,
+          "description": "Maximum number of CLOSED files to keep fully indexed in the LRU cache (§A8)."
+        },
+        "enma.preprocessor.maxIncludeDepth": {
+          "type": "number",
+          "default": 64,
+          "description": "Maximum #include nesting depth before the preprocessor reports an error (§A4)."
+        },
+        "enma.indexExclude": {
+          "type": "array",
+          "default": ["node_modules", ".git", "output", "dist", "build"],
+          "description": "Directory names skipped during workspace .em indexing.",
+          "items": { "type": "string" }
+        },
+        "enma.implicitMutualInclusion": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, every .em file in the workspace can see every other .em file without an explicit #include."
+        },
+        "enma.permissions.ffi": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow [[dll]] / FFI annotations to bind without a permission error."
+        },
+        "enma.permissions.file": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow file-system intrinsics to bind without a permission error."
+        },
+        "enma.parser.strict": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable strict parsing — reject all kill-rule recoveries (§A1)."
+        },
+        "enma.analyzer.severity": {
+          "type": "string",
+          "enum": ["error", "warning"],
+          "default": "error",
+          "description": "Global severity for non-exempt analyzer diagnostics (§R21 rollback knob)."
+        },
+        "enma.forceIncludePredefined": {
+          "type": "array",
+          "default": [],
+          "description": "Paths to additional .em.predefined files to load with forceInclude precedence (workspace > forceInclude > bundled).",
+          "items": { "type": "string" }
+        },
+        "enma.predefined.walkUpDepth": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "maximum": 8,
+          "description": "Number of parent directories to scan for .em.predefined files when the workspace root is a subdirectory of a larger project. Set to 0 to disable walk-up discovery."
+        },
+        "enma.formatter.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable the Enma document formatter. Set to false if AC-11 idempotency fails (v1.0.1 graduation criterion)."
+        },
+        "enma.formatter.indentSpaces": {
+          "type": "number",
+          "default": 4,
+          "description": "Number of spaces per indent level (when useTabIndent is false)."
+        },
+        "enma.formatter.useTabIndent": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use a tab character for indentation instead of spaces."
+        },
+        "enma.formatter.maxBlankLines": {
+          "type": "number",
+          "default": 1,
+          "description": "Maximum number of consecutive blank lines to preserve. Extra blank lines are collapsed."
+        },
+        "enma.formatter.bracePosition": {
+          "type": "string",
+          "enum": ["sameLine", "nextLine"],
+          "default": "sameLine",
+          "description": "Where to place opening braces: sameLine (K&R style) or nextLine (Allman style)."
+        },
+        "enma.formatter.spaceAfterComma": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert a space after commas in argument lists, parameter lists, and initializers."
+        },
+        "enma.formatter.spaceAroundBinaryOp": {
+          "type": "boolean",
+          "default": true,
+          "description": "Insert spaces around binary operators (+, -, ==, &&, etc.)."
+        },
+        "enma.formatter.alignDesignatedInit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Align the '=' in designated initializer lists so values start in the same column."
+        },
+        "enma.formatter.fStringPreserveVerbatim": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserve f-string byte content verbatim (no whitespace insertion inside interpolations). Disabling may allow internal mutation — not recommended."
+        },
+        "enma.bundler.sourceDirectory": {
+          "type": "string",
+          "default": "source",
+          "description": "Workspace-relative directory containing the bundler entry file (main.em)."
+        },
+        "enma.bundler.outputFile": {
+          "type": "string",
+          "default": "output/bundled.em",
+          "description": "Workspace-relative path to write the bundled .em file."
+        },
+        "enma.bundler.stripComments": {
+          "type": "boolean",
+          "default": true,
+          "description": "Strip line and block comments from the bundled output."
+        },
+        "enma.projects": {
+          "type": "array",
+          "default": [],
+          "description": "List of bundler projects. Each project: { name, src, out, strip? }.",
+          "items": {
+            "type": "object",
+            "required": ["name", "src", "out"],
+            "properties": {
+              "name": { "type": "string" },
+              "src":  { "type": "string" },
+              "out":  { "type": "string" },
+              "strip": { "type": "boolean", "default": false }
+            }
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -b && npm run copy-predefined && node esbuild.config.mjs",
+    "watch": "tsc -b -w",
+    "lint": "eslint ./client/src ./server/src --ext .ts",
+    "test": "cd server && npm test && cd ..",
+    "copy-predefined": "node scripts/copy-predefined.mjs",
+    "regenerate-stdlib": "node tools/regenerate-stdlib.mjs",
+    "validate-predefined": "node tools/validate-predefined.mjs",
+    "corpus": "node tools/corpus-fuzz.mjs",
+    "package": "vsce package",
+    "vscode:prepublish": "tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p client/tsconfig.json && npm run copy-predefined && node scripts/build-prod.mjs"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.14.6",
+    "@vscode/debugadapter": "^1.61.0",
+    "@vscode/test-electron": "^2.3.9",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.57.0",
+    "mocha": "^10.3.0",
+    "typescript": "^5.3.3",
+    "vscode-languageclient": "^9.0.1"
+  }
+}

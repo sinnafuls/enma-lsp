@@ -1,0 +1,16 @@
+{
+  "name": "enma-language-client",
+  "description": "VSCode client for the Enma language server.",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.1"
+  }
+}

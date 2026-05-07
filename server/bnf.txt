@@ -1,0 +1,261 @@
+# Enma grammar — source of truth for the hand-written recursive-descent parser.
+# Updated alongside parser.ts. Each parse function carries `// BNF: <prod>` comment.
+#
+# Conventions:
+#   PROD     ::= alternative1 | alternative2
+#   { x }    means zero-or-more of x
+#   [ x ]    means optional x
+#   ( x )    grouping
+#   'literal' for terminals shown verbatim
+#   <NAME>   for terminal token kinds
+#
+# Whitespace, comments, preprocessor directives are stripped pre-parse (Phase 2 output).
+# Identifiers and reserved words are <ID> and <KW> respectively.
+
+Script        ::= { TopLevel }
+
+TopLevel      ::= Annotations TopLevelInner
+
+TopLevelInner ::= Import
+                | Namespace
+                | Using
+                | Typedef
+                | Template
+                | Mixin
+                | Delegate
+                | Class
+                | Struct
+                | Interface
+                | Enum
+                | ExternDecl
+                | Coroutine
+                | FunctionOrVar
+
+Import        ::= 'import' STRING ';'
+
+Namespace     ::= 'namespace' <ID> '{' { TopLevel } '}'
+
+Using         ::= 'using' 'namespace' QualifiedName ';'
+                | 'using' <ID> '=' Type ';'
+
+Typedef       ::= 'typedef' Type <ID> ';'
+
+Template      ::= 'template' '<' TemplateParamList '>' TopLevelInner
+
+TemplateParamList ::= TemplateParam { ',' TemplateParam }
+TemplateParam ::= 'typename' <ID> [ '=' Type ]
+                | <ID>
+
+Mixin         ::= 'mixin' <ID> [ ':' BaseList ] '{' { Member } '}'
+
+Delegate      ::= 'delegate' Type <ID> '(' [ ParamList ] ')' ';'
+
+# §A3 multi-inheritance: comma-separated bases, no access modifiers.
+# C3 MRO is computed at analyzer level.
+Class         ::= 'class' <ID> [ ':' BaseList ] '{' { Member } '}'
+Struct        ::= 'struct' <ID> [ ':' BaseList ] '{' { Member } '}'
+Interface     ::= 'interface' <ID> [ ':' BaseList ] '{' { Member } '}'
+
+BaseList      ::= Type { ',' Type }
+
+Enum          ::= 'enum' <ID> [ ':' Type ] '{' EnumValueList [ ',' ] '}'
+EnumValueList ::= <ID> [ '=' Expr ] { ',' <ID> [ '=' Expr ] }
+
+ExternDecl    ::= 'extern' Type <ID> '(' [ ParamList ] ')' ';'
+
+Coroutine     ::= 'coroutine' Type <ID> '(' [ ParamList ] ')' Block
+
+# Free function or variable declaration. Disambiguate by lookahead:
+#   <Type> <name> '('   → function
+#   <Type> <name> '<'   → ambiguous (function template-call vs binary op);
+#                         only in body (not top-level decl); see ExprPostfix.
+#   <Type> <name> ';'   → var
+#   <Type> <name> '='   → var with initializer
+FunctionOrVar ::= Modifier* Type <ID> ( FunctionTail | VarTail )
+FunctionTail  ::= '(' [ ParamList ] ')' ( Block | ';' )
+VarTail       ::= [ '=' Expr ] ';'
+Modifier      ::= 'static' | 'const' | 'constexpr' | 'inline' | 'override'
+                | 'public' | 'private' | 'volatile'
+
+# Class members
+Member        ::= Annotations MemberInner
+MemberInner   ::= Constructor
+                | Destructor
+                | Property
+                | OperatorOverload
+                | Method
+                | Field
+                | Typedef
+                | Using
+                | Enum
+                | Struct
+                | Class
+                | Interface
+                | Mixin
+                | Delegate
+                | Template
+
+Field         ::= Modifier* Type <ID> [ '=' Expr ] ';'
+
+Method        ::= [ 'template' '<' TemplateParamList '>' ]
+                  Modifier* Type <ID> '(' [ ParamList ] ')' ( Block | ';' )
+
+Constructor   ::= <ID-matching-class-name> '(' [ ParamList ] ')' Block
+Destructor    ::= '~' <ID-matching-class-name> '(' ')' Block
+
+Property      ::= 'property' Type <ID> '{' [ 'get' Block ] [ 'set' Block ] '}'
+
+OperatorOverload ::= Modifier* Type 'operator' OpToken '(' [ ParamList ] ')' Block
+OpToken       ::= '+' | '-' | '*' | '/' | '%' | '==' | '!=' | '<' | '<=' | '>'
+                | '>=' | '<<' | '>>' | '[' ']' | '(' ')' | '=' | '&&' | '||'
+                | '&' | '|' | '^' | '~' | '!' | '+=' | '-=' | '*=' | '/='
+
+ParamList     ::= Param { ',' Param }
+              | '...'
+Param         ::= Type [ <ID> [ '=' Expr ] ]
+                | '...' [ <ID> ]
+
+Annotations   ::= { Annotation }
+Annotation    ::= '[[' <ID-or-KW> [ '(' [ ExprList ] ')' ] ']]'
+
+# Types — a name path with optional generics, pointer suffixes, references.
+Type          ::= [ 'const' ] [ 'nullable' ] QualifiedName [ '<' TypeArgList '>' ] { '*' } [ '&' ]
+QualifiedName ::= <ID-or-KW> { '::' <ID-or-KW> }
+TypeArgList   ::= Type { ',' Type }
+
+# Statements
+Block         ::= '{' { Stmt } '}'
+Stmt          ::= Block
+                | If
+                | For
+                | While
+                | DoWhile
+                | Switch
+                | 'break' ';'
+                | 'continue' ';'
+                | 'return' [ Expr ] ';'
+                | 'goto' <ID> ';'
+                | <ID> ':'                                   # label
+                | Try
+                | 'throw' [ Expr ] ';'
+                | 'defer' Block
+                | 'yield' [ Expr ] ';'
+                | VarStmt
+                | ExprStmt
+                | ';'                                        # empty
+If            ::= 'if' '(' Expr ')' Stmt [ 'else' Stmt ]
+For           ::= 'for' '(' [ ForInit ] ';' [ Expr ] ';' [ Expr ] ')' Stmt
+                | 'for' '(' Type <ID> ':' Expr ')' Stmt        # foreach
+ForInit       ::= VarStmt | ExprStmt
+While         ::= 'while' '(' Expr ')' Stmt
+DoWhile       ::= 'do' Stmt 'while' '(' Expr ')' ';'
+Switch        ::= 'switch' '(' Expr ')' '{' { SwitchCase } '}'
+SwitchCase    ::= ( 'case' Expr ':' | 'default' ':' ) { Stmt }
+Try           ::= 'try' Block { 'catch' '(' Type [ <ID> ] ')' Block } [ 'finally' Block ]
+VarStmt       ::= Modifier* Type <ID> [ '=' Expr ] ';'
+ExprStmt      ::= Expr ';'
+
+# Expressions, ascending precedence.
+Expr          ::= Assign
+Assign        ::= Ternary [ AssignOp Expr ]
+AssignOp      ::= '=' | '+=' | '-=' | '*=' | '/=' | '%=' | '<<=' | '>>=' | '&=' | '|=' | '^='
+Ternary       ::= LogicalOr [ '?' Expr ':' Expr ]
+LogicalOr     ::= LogicalAnd { '||' LogicalAnd }
+LogicalAnd    ::= BitOr { '&&' BitOr }
+BitOr         ::= BitXor { '|' BitXor }
+BitXor        ::= BitAnd { '^' BitAnd }
+BitAnd        ::= Equality { '&' Equality }
+Equality      ::= Relational { ('=='|'!=') Relational }
+Relational    ::= Shift { ('<'|'<='|'>'|'>=') Shift }
+Shift         ::= AddSub { ('<<'|'>>') AddSub }
+AddSub        ::= MulDiv { ('+'|'-') MulDiv }
+MulDiv        ::= Unary { ('*'|'/'|'%') Unary }
+Unary         ::= ( '!' | '-' | '+' | '~' | '*' | '&' | '++' | '--' ) Unary
+                | Cast
+                | New
+                | Delete
+                | Sizeof
+                | Offsetof
+                | StaticAssert
+                | Postfix
+Cast          ::= ('cast'|'static_cast'|'reinterpret_cast'|'const_cast') '<' Type '>' '(' Expr ')'
+New           ::= 'new' Type [ '[' Expr ']' ] [ '(' [ ExprList ] ')' ]
+Delete        ::= 'delete' [ '[]' ] Postfix
+Sizeof        ::= 'sizeof' '(' ( Type | Expr ) ')'
+Offsetof      ::= 'offsetof' '(' Type ',' MemberPath ')'
+MemberPath    ::= <ID> { '.' <ID> }
+StaticAssert  ::= 'static_assert' '(' Expr [ ',' Expr ] ')'
+
+Postfix       ::= Primary { PostfixSuffix }
+PostfixSuffix ::= '(' [ ExprList ] ')'                      # call
+                | '<' TypeArgList '>' '(' [ ExprList ] ')'   # template-arg call
+                | '.' <ID>                                    # member
+                | '->' <ID>                                   # arrow member
+                | '::' <ID-or-KW>                             # namespace access
+                | '[' Expr ']'                                # index
+                | '++'
+                | '--'
+
+Primary       ::= '(' Expr ')'
+                | LambdaBracket
+                | LambdaArrow
+                | Match
+                | DesignatedInit
+                | ArrayInit
+                | FuncRef
+                | Intrinsic
+                | 'this'
+                | 'true' | 'false' | 'null' | 'nullptr'
+                | <NUMBER> [ <ID> ]                          # UDL: 42_km
+                | <FLOAT>
+                | <STRING>
+                | <CHAR>
+                | FString
+                | <ID>
+
+# §A2 f-string boundary tokens consumed here.
+FString       ::= <FStringStart> { <FStringText> | <FStringExprOpen> Expr <FStringExprClose> } <FStringEnd>
+
+# Lambdas — bracket form vs arrow form distinguished by leading `[`/`(`.
+LambdaBracket ::= '[' [ CaptureList ] ']' '(' [ ParamList ] ')' [ '->' Type ] Block
+LambdaArrow   ::= '(' [ ParamList ] ')' '=>' ( Expr | Block )
+CaptureList   ::= Capture { ',' Capture }
+Capture       ::= '&' <ID>                                   # by-ref
+                | <ID>                                       # by-value
+                | '&'                                        # default by-ref
+                | '='                                        # default by-value
+
+# Match (expression-form):
+Match         ::= 'match' '(' Expr ')' '{' MatchArmList '}'
+MatchArmList  ::= MatchArm { ',' MatchArm } [ ',' ]
+MatchArm      ::= ( '_' | Expr ) '=>' Expr
+
+DesignatedInit ::= [ Type ] '{' DesignatedField { ',' DesignatedField } [ ',' ] '}'
+DesignatedField ::= '.' <ID> '=' Expr
+
+ArrayInit     ::= '{' [ ExprList ] '}'
+
+FuncRef       ::= '@' QualifiedName
+
+Intrinsic     ::= IntrinsicKW [ '(' [ ExprList ] ')' ]
+IntrinsicKW   ::= '__va_count' | '__va_arg'
+                | '__asm_rdtsc' | '__asm_pause' | '__asm_mfence' | '__asm_nop'
+
+ExprList      ::= Expr { ',' Expr }
+
+# ---- Notes ----
+# 1. ArrayInit and DesignatedInit are both `{ ... }` — distinguish by presence of `.IDENT =`
+#    in first non-`{` token. The parser does a tentative look-ahead.
+# 2. LambdaBracket vs ArrayInit distinguished by lambda’s requirement for `(...)` after `]`.
+#    A bare `[1, 2]` is rejected (Enma uses `{1, 2}` for array init).
+# 3. `match` is parsed as both an expression (`int x = match(...) {...}`) and a stmt-expr
+#    (`match(...) { ... };`).
+# 4. Template-call disambiguation in Postfix: only commit to `<TypeArgList>` if the `<` is
+#    immediately followed by a type-name token AND the matching `>` is followed by `(`.
+#    Otherwise treat `<` as binary comparison.
+# 5. UDL (§Phase 1): the tokenizer emits `42_km` as `TokenNumber(42)` then `TokenIdentifier(_km)`.
+#    The parser combines them in Primary if the identifier starts with `_`.
+# 6. `defer { ... }` always takes a block (no single-stmt form).
+# 7. `extern` decls have no body; signaled by closing `;` rather than `{`.
+# 8. Variadic param `...` may appear alone or trailing the regular params.
+# 9. Empty `;` is a valid Stmt (no-op).

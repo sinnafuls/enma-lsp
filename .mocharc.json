@@ -1,0 +1,10 @@
+{
+  "extension": ["ts"],
+  "spec": ["server/test/**/*.test.ts"],
+  "require": ["ts-node/register"],
+  "timeout": 10000,
+  "reporter": "spec",
+  "env": {
+    "TS_NODE_PROJECT": "server/tsconfig.test.json"
+  }
+}

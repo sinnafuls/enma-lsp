@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+client/dist/
+client/out/
+server/dist/
+server/out/
+*.tsbuildinfo
+*.map
+
+# Packaged extension
+*.vsix
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo
+
+# VSCode workspace state (keep settings.json / launch.json if intentional;
+# uncomment the next line to ignore the whole folder)
+# .vscode/
+.vscode-test/
+
+# AI tooling state — never publish
+.omc/
+.claude/
+
+# Local working notes (uncomment if you don't want these public)
+# progress.txt
+# prd.json
+# smoke-test.js
+
+# Tree-sitter spike — generated artifacts and large binaries
+spike/tree-sitter-enma/node_modules/
+spike/tree-sitter-enma/src/parser.c
+spike/tree-sitter-enma/parser.exp
+spike/tree-sitter-enma/parser.lib
+spike/tree-sitter-enma/parser.obj
+spike/tree-sitter-enma/scanner.obj
+spike/tree-sitter-enma/build/
+
+# pcx-extended-api — large binary doc; keep markdown sources
+pcx-extended-api/*.pdf
