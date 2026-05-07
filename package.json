@@ -2,7 +2,7 @@
   "name": "enma-language",
   "displayName": "Enma Language",
   "description": "Syntax highlighting, snippets, hover docs, completion, signature help, and full LSP services for the Enma scripting language (.em).",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "sin",
   "license": "MIT",
   "repository": {
@@ -119,7 +119,10 @@
     "taskDefinitions": [
       {
         "type": "enma-bundle",
-        "required": ["src", "out"],
+        "required": [
+          "src",
+          "out"
+        ],
         "properties": {
           "src": {
             "type": "string",
@@ -146,11 +149,15 @@
               "variable.other.declaration.enma",
               "variable.other.readwrite.enma"
             ],
-            "settings": { "foreground": "#9CDCFE" }
+            "settings": {
+              "foreground": "#9CDCFE"
+            }
           },
           {
             "scope": "variable.other.property.enma",
-            "settings": { "foreground": "#9CDCFE" }
+            "settings": {
+              "foreground": "#9CDCFE"
+            }
           },
           {
             "scope": [
@@ -163,19 +170,27 @@
               "entity.name.type.delegate.enma",
               "entity.other.inherited-class.enma"
             ],
-            "settings": { "foreground": "#4EC9B0" }
+            "settings": {
+              "foreground": "#4EC9B0"
+            }
           },
           {
             "scope": "entity.name.function.enma",
-            "settings": { "foreground": "#DCDCAA" }
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
           },
           {
             "scope": "entity.name.function.member.enma",
-            "settings": { "foreground": "#DCDCAA" }
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
           },
           {
             "scope": "support.function.intrinsic.enma",
-            "settings": { "foreground": "#DCDCAA" }
+            "settings": {
+              "foreground": "#DCDCAA"
+            }
           },
           {
             "scope": [
@@ -183,22 +198,26 @@
               "string.quoted.single.enma",
               "string.quoted.double.interpolated.enma"
             ],
-            "settings": { "foreground": "#D69D85" }
+            "settings": {
+              "foreground": "#D69D85"
+            }
           },
           {
             "scope": "entity.name.namespace.enma",
-            "settings": { "foreground": "#D4D4D4" }
+            "settings": {
+              "foreground": "#D4D4D4"
+            }
           }
         ]
       },
       "editor.semanticTokenColorCustomizations": {
         "enabled": true,
         "rules": {
-          "variable.global:enma":  "#D4D4D4",
-          "function.global:enma":  "#DCDCAA",
+          "variable.global:enma": "#D4D4D4",
+          "function.global:enma": "#DCDCAA",
           "namespace.global:enma": "#D4D4D4",
-          "class.global:enma":     "#4EC9B0",
-          "enum.global:enma":      "#4EC9B0"
+          "class.global:enma": "#4EC9B0",
+          "enum.global:enma": "#4EC9B0"
         }
       }
     },
@@ -218,9 +237,17 @@
         },
         "enma.indexExclude": {
           "type": "array",
-          "default": ["node_modules", ".git", "output", "dist", "build"],
+          "default": [
+            "node_modules",
+            ".git",
+            "output",
+            "dist",
+            "build"
+          ],
           "description": "Directory names skipped during workspace .em indexing.",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "enma.implicitMutualInclusion": {
           "type": "boolean",
@@ -244,7 +271,10 @@
         },
         "enma.analyzer.severity": {
           "type": "string",
-          "enum": ["error", "warning"],
+          "enum": [
+            "error",
+            "warning"
+          ],
           "default": "error",
           "description": "Global severity for non-exempt analyzer diagnostics (§R21 rollback knob)."
         },
@@ -252,7 +282,9 @@
           "type": "array",
           "default": [],
           "description": "Paths to additional .em.predefined files to load with forceInclude precedence (workspace > forceInclude > bundled).",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "enma.predefined.walkUpDepth": {
           "type": "number",
@@ -283,7 +315,10 @@
         },
         "enma.formatter.bracePosition": {
           "type": "string",
-          "enum": ["sameLine", "nextLine"],
+          "enum": [
+            "sameLine",
+            "nextLine"
+          ],
           "default": "sameLine",
           "description": "Where to place opening braces: sameLine (K&R style) or nextLine (Allman style)."
         },
@@ -328,12 +363,25 @@
           "description": "List of bundler projects. Each project: { name, src, out, strip? }.",
           "items": {
             "type": "object",
-            "required": ["name", "src", "out"],
+            "required": [
+              "name",
+              "src",
+              "out"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "src":  { "type": "string" },
-              "out":  { "type": "string" },
-              "strip": { "type": "boolean", "default": false }
+              "name": {
+                "type": "string"
+              },
+              "src": {
+                "type": "string"
+              },
+              "out": {
+                "type": "string"
+              },
+              "strip": {
+                "type": "boolean",
+                "default": false
+              }
             }
           }
         }
