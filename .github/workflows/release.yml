@@ -30,6 +30,9 @@ jobs:
           cd server && npx tsc --noEmit
           cd ../client && npx tsc --noEmit
 
+      - name: Generate corpus (deterministic — required by §A6 corpus tests)
+        run: npm run corpus
+
       - name: Test
         run: npm test
 
