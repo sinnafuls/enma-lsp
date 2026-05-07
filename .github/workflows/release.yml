@@ -98,3 +98,26 @@ jobs:
           files: "*.vsix"
           draft: false
           prerelease: false
+
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL secret not set — skipping Discord notification."
+            exit 0
+          fi
+
+          VSIX_FILE=$(ls enma-language-*.vsix | head -n1)
+
+          # Build payload with jq so newlines/quotes survive escaping
+          jq -n \
+            --arg content "🚀 **enma-lsp v${VERSION}** released — [release notes](${REPO_URL}/releases/tag/v${VERSION})" \
+            '{content: $content}' > payload.json
+
+          curl -fsS -X POST \
+            -F "payload_json=<payload.json" \
+            -F "file=@${VSIX_FILE}" \
+            "$DISCORD_WEBHOOK_URL"
