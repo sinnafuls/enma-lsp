@@ -119,6 +119,7 @@ export class SymbolScope {
     }
 
     public getGlobalScope(): SymbolGlobalScope {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         let s: SymbolScope = this;
         while (s._parent !== undefined) s = s._parent;
         return s as SymbolGlobalScope;

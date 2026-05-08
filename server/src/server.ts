@@ -26,7 +26,7 @@ const documents: lsp.TextDocuments<TextDocument> = new lsp.TextDocuments(TextDoc
 
 const inspector = new Inspector();
 let workspaceRoot: string | undefined;
-let formatterSettings: FormatterSettings = { ...defaultFormatterSettings };
+const formatterSettings: FormatterSettings = { ...defaultFormatterSettings };
 
 inspector.registerDiagnosticsCallback((params) => {
     connection.sendDiagnostics(params);

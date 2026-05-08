@@ -176,7 +176,7 @@ function walkExpr(expr: NodeExpr, range: TextRange, globalScope: SymbolGlobalSco
 function emitParameterNameHints(call: NodeExprCall, globalScope: SymbolGlobalScope, out: lsp.InlayHint[]): void {
     // Determine callee name from the callee expression.
     let calleeName: string | undefined;
-    let calleeScope: SymbolScope = globalScope;
+    const calleeScope: SymbolScope = globalScope;
     const cexpr = call.callee;
     if (cexpr.kind === NodeKind.ExprIdentifier) {
         calleeName = cexpr.token.text;
