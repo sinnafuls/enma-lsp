@@ -12,7 +12,7 @@ import {
 
 // Multi-character operators in longest-match order
 const MULTI_CHAR_OPERATORS: readonly string[] = [
-    '<<=', '>>=',
+    '<<=', '>>=', '<=>',
     '[[', ']]',
     '<<', '>>', '==', '!=', '<=', '>=', '&&', '||',
     '++', '--',
@@ -262,6 +262,34 @@ function isHexDigit(ch: string): boolean {
     return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
 }
 
+function isBinDigit(ch: string): boolean {
+    return ch === '0' || ch === '1';
+}
+
+// Consumes a run of digits with optional `_` digit separators (Enma v1.1).
+// Rule: `_` is consumed only when surrounded by digits (or hex/bin digits per `isDigitFn`).
+//   `1_000`     → consumes `1_000`   (separator)
+//   `42_km`     → consumes `42`, leaves `_km` (UDL — `_` not followed by digit)
+//   `1_`        → consumes `1`, leaves `_` (no trailing-only separator)
+//   `1__2`      → consumes `1`, leaves `__2` (no double separator)
+//   `_1`        → consumes nothing (caller had isDigitFn(peek)===true to enter)
+function readDigitRun(state: TokenizerState, isDigitFn: (ch: string) => boolean): string {
+    let text = '';
+    if (state.isEOF || !isDigitFn(state.peek())) return text;
+    text += state.advance();
+    while (!state.isEOF) {
+        const ch = state.peek();
+        if (isDigitFn(ch)) {
+            text += state.advance();
+        } else if (ch === '_' && isDigitFn(state.peek(1))) {
+            text += state.advance(); // consume `_`; next iteration consumes the digit
+        } else {
+            break;
+        }
+    }
+    return text;
+}
+
 function isIdentStart(ch: string): boolean {
     return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch === '_';
 }
@@ -438,24 +466,31 @@ function readCharLiteral(state: TokenizerState, uri: string, startPos: TextPosit
 // ---- Numbers ----
 
 function readNumber(state: TokenizerState, uri: string, startPos: TextPosition): TokenNumber {
-    // Hex: 0x...
+    // Hex: 0x...  (Enma v1.1: digit separators allowed: 0xFF_FF)
     if (state.peek() === '0' && (state.peek(1) === 'x' || state.peek(1) === 'X')) {
         let text = state.advanceN(2);
-        while (!state.isEOF && isHexDigit(state.peek())) text += state.advance();
+        text += readDigitRun(state, isHexDigit);
         const endPos = state.currentPos();
         return { kind: TokenKind.Number, text, numericKind: 'hex', location: makeLoc(uri, startPos, endPos) };
     }
 
-    // Decimal integer or float
-    let text = '';
-    while (!state.isEOF && isDigit(state.peek())) text += state.advance();
+    // Binary: 0b...  (Enma v1.1: 0b1010, with optional digit separators)
+    if (state.peek() === '0' && (state.peek(1) === 'b' || state.peek(1) === 'B')) {
+        let text = state.advanceN(2);
+        text += readDigitRun(state, isBinDigit);
+        const endPos = state.currentPos();
+        return { kind: TokenKind.Number, text, numericKind: 'bin', location: makeLoc(uri, startPos, endPos) };
+    }
+
+    // Decimal integer or float (Enma v1.1: digit separators allowed in all parts)
+    let text = readDigitRun(state, isDigit);
 
     let isFloat = false;
-    // Fractional part
+    // Fractional part — `.` followed by a digit
     if (!state.isEOF && state.peek() === '.' && isDigit(state.peek(1))) {
         isFloat = true;
         text += state.advance(); // .
-        while (!state.isEOF && isDigit(state.peek())) text += state.advance();
+        text += readDigitRun(state, isDigit);
     }
 
     // Exponent
@@ -463,7 +498,7 @@ function readNumber(state: TokenizerState, uri: string, startPos: TextPosition):
         isFloat = true;
         text += state.advance();
         if (!state.isEOF && (state.peek() === '+' || state.peek() === '-')) text += state.advance();
-        while (!state.isEOF && isDigit(state.peek())) text += state.advance();
+        text += readDigitRun(state, isDigit);
     }
 
     // float32 'f' suffix — consume 'f' even if followed by '_' (UDL: 1.5f_meter → number=1.5f, ident=_meter)

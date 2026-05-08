@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.1.0 — Enma v1.1 language update (Tier 1: tokenizer)
+
+This release adds tokenizer-level support for the Enma v1.1 language spec. Source-code with the new lexical forms now parses without spurious diagnostics from the LSP.
+
+### What's new
+
+- **Binary integer literals** — `0b1010`, `0B1101`. Same numeric value as the equivalent decimal/hex; emitted with `numericKind: 'bin'`.
+- **Digit separators in numeric literals** — `1_000_000`, `0xFF_FF`, `0b1010_1010`, `1_234.567_8`, `1_000e3`, `1e1_000`. The `_` is consumed as a separator iff followed by a digit valid for the current numeric base; this preserves UDL handling (`1_500_km` still splits as number `1_500` + UDL identifier `_km`).
+- **Spaceship operator `<=>`** — emitted as a single `Operator` token. Longest-match precedence ensures `a<=>b` does not split as `<=` + `>`. Operator overload resolution is Tier 3 (analyzer) work; the tokenizer just produces the token.
+- **New reserved keywords** `final`, `virtual`, `friend` — added to the `KEYWORDS` set. `enum class` / `enum struct` parser support is Tier 2 work.
+
+### What's NOT in this release (deferred)
+
+The Enma v1.1 spec includes language-semantics changes (value semantics on struct pass-by-value, new operator overloads, `operator T()` implicit conversions, `operator<=>` auto-derive of all six comparisons, copy/move ctors with `move(a)`, `constexpr` struct/array literal folding, trailing return on regular functions, uniform init, designated init, C++17 if-init, postfix `++/--` distinction, namespace-qualified ctors). These require parser and analyzer changes that are gated on resolving 6 open spec questions documented in `docs/v1.1-implementation-notes.md` and the consensus-approved plan at `.omc/plans/enma-v1.1-language-update.md`.
+
+### Files changed
+
+- `server/src/compiler_tokenizer/reservedWord.ts` — added `final`, `virtual`, `friend`
+- `server/src/compiler_tokenizer/tokenizer.ts` — added `<=>`, binary literal scanner, `readDigitRun` helper supporting digit separators
+- `server/src/compiler_tokenizer/tokenObject.ts` — extended `NumericKind` union with `'bin'`
+- `server/src/compiler_parser/parserPreprocess.ts` — `parseNumber()` strips `_` separators and handles `0b...`
+- `server/test/unit/tokenizer/literals.test.ts` — extended with binary literal + digit separator + UDL boundary regression tests
+- `server/test/unit/tokenizer/spaceship.test.ts` — new file
+- `docs/v1.1-implementation-notes.md` — new file documenting spec source and surface-syntax interpretation decisions
+- `package.json` — `@typescript-eslint/parser` + `@typescript-eslint/eslint-plugin` added to devDependencies (closes pre-existing lint env gap)
+
+### Tests
+
+- 841 passing, 2 pending (was 816 passing post-cleanup; +25 new tests)
+- `npm test` clean
+- `cd server && npx tsc --noEmit` clean
+- Cold parse of `samples/showcase.em`: median 0.233ms (better than post-cleanup baseline of 0.258ms)
+
+---
+
 ## 1.0.0 — v1.0-core + v1.0-extended formatter
 
 ### Ships in this release

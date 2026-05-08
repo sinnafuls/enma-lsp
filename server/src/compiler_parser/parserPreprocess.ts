@@ -773,13 +773,18 @@ function buildExprTokens(tokens: TokenObject[], macroDefs: Map<string, MacroDef>
 }
 
 function parseNumber(text: string): number {
-    if (text.startsWith('0x') || text.startsWith('0X')) {
-        return parseInt(text, 16);
+    // Enma v1.1: strip digit separators (`_`) before numeric conversion.
+    const clean = text.replace(/_/g, '');
+    if (clean.startsWith('0x') || clean.startsWith('0X')) {
+        return parseInt(clean.slice(2), 16);
     }
-    if (text.endsWith('f')) {
-        return parseFloat(text.slice(0, -1));
+    if (clean.startsWith('0b') || clean.startsWith('0B')) {
+        return parseInt(clean.slice(2), 2);
     }
-    const n = parseFloat(text);
+    if (clean.endsWith('f')) {
+        return parseFloat(clean.slice(0, -1));
+    }
+    const n = parseFloat(clean);
     return isNaN(n) ? 0 : n;
 }
 

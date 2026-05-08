@@ -20,7 +20,7 @@ export const enum TokenKind {
     EOF             = 'eof',
 }
 
-export type NumericKind = 'int' | 'hex' | 'float' | 'udl-number-part';
+export type NumericKind = 'int' | 'hex' | 'bin' | 'float' | 'udl-number-part';
 export type StringKind  = 'single' | 'double' | 'heredoc';
 export type CommentKind = 'line' | 'block' | 'doc';
 

@@ -17,6 +17,7 @@ export const KEYWORDS: ReadonlySet<string> = new Set([
     // modifiers
     'static', 'const', 'constexpr', 'override', 'public', 'private',
     'nullable', 'out', 'inline', 'auto', 'volatile', 'get', 'set',
+    'final', 'virtual', 'friend',
     // literals
     'true', 'false', 'null', 'nullptr', 'this',
     // memory / casts

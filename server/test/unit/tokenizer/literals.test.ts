@@ -236,4 +236,150 @@ describe('Tokenizer — literals', () => {
         assert.strictEqual(nonEof[1].kind, TokenKind.Operator);
         assert.strictEqual(nonEof[1].text, '.');
     });
+
+    // --- Enma v1.1: binary literals ---
+    it('binary literal 0b1010', () => {
+        const toks = tokenize('test.em', '0b1010');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'bin');
+        assert.strictEqual(toks[0].text, '0b1010');
+    });
+
+    it('binary literal uppercase 0B', () => {
+        const toks = tokenize('test.em', '0B1101');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'bin');
+        assert.strictEqual(toks[0].text, '0B1101');
+    });
+
+    it('binary literal does NOT consume non-binary digits', () => {
+        const toks = tokenize('test.em', '0b1012');
+        const nonEof = toks.filter(t => t.kind !== TokenKind.EOF);
+        // 0b101 is the binary literal; the 2 is a separate decimal token
+        assert.strictEqual(nonEof[0].kind, TokenKind.Number);
+        assert.strictEqual((nonEof[0] as any).numericKind, 'bin');
+        assert.strictEqual(nonEof[0].text, '0b101');
+        assert.strictEqual(nonEof[1].kind, TokenKind.Number);
+        assert.strictEqual(nonEof[1].text, '2');
+    });
+
+    // --- Enma v1.1: digit separators in decimals ---
+    it('decimal with digit separator 1_000', () => {
+        const toks = tokenize('test.em', '1_000');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'int');
+        assert.strictEqual(toks[0].text, '1_000');
+    });
+
+    it('decimal with multiple separators 1_000_000', () => {
+        const toks = tokenize('test.em', '1_000_000');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual(toks[0].text, '1_000_000');
+    });
+
+    // --- Enma v1.1: digit separators in hex ---
+    it('hex with digit separator 0xFF_FF', () => {
+        const toks = tokenize('test.em', '0xFF_FF');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'hex');
+        assert.strictEqual(toks[0].text, '0xFF_FF');
+    });
+
+    it('hex with multiple separators 0xDE_AD_BE_EF', () => {
+        const toks = tokenize('test.em', '0xDE_AD_BE_EF');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual(toks[0].text, '0xDE_AD_BE_EF');
+    });
+
+    // --- Enma v1.1: digit separators in binary ---
+    it('binary with digit separator 0b1010_1010', () => {
+        const toks = tokenize('test.em', '0b1010_1010');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'bin');
+        assert.strictEqual(toks[0].text, '0b1010_1010');
+    });
+
+    // --- Enma v1.1: digit separators in floats ---
+    it('float with separators in integer part 1_234.5', () => {
+        const toks = tokenize('test.em', '1_234.5');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'float');
+        assert.strictEqual(toks[0].text, '1_234.5');
+    });
+
+    it('float with separators on both sides of dot 1_234.567_8', () => {
+        const toks = tokenize('test.em', '1_234.567_8');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'float');
+        assert.strictEqual(toks[0].text, '1_234.567_8');
+    });
+
+    it('float with separator before exponent 1_000e3', () => {
+        const toks = tokenize('test.em', '1_000e3');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'float');
+        assert.strictEqual(toks[0].text, '1_000e3');
+    });
+
+    it('float with separator inside exponent 1e1_000', () => {
+        const toks = tokenize('test.em', '1e1_000');
+        assert.strictEqual(toks[0].kind, TokenKind.Number);
+        assert.strictEqual((toks[0] as any).numericKind, 'float');
+        assert.strictEqual(toks[0].text, '1e1_000');
+    });
+
+    // --- Enma v1.1: separators must NOT consume in UDL boundary cases ---
+    it('UDL still works with separator-aware scanner: 1_500_km', () => {
+        // Per release notes: "UDLs still work: 1_500_km"
+        // 1_500 is the number (separator consumed), _km is the UDL identifier
+        const toks = tokenize('test.em', '1_500_km');
+        const nonEof = toks.filter(t => t.kind !== TokenKind.EOF);
+        assert.strictEqual(nonEof.length, 2, 'Should split into number + UDL identifier');
+        assert.strictEqual(nonEof[0].kind, TokenKind.Number);
+        assert.strictEqual(nonEof[0].text, '1_500');
+        assert.strictEqual(nonEof[1].kind, TokenKind.Identifier);
+        assert.strictEqual(nonEof[1].text, '_km');
+    });
+
+    it('UDL 42_km still splits cleanly (no digit after _)', () => {
+        // Regression: existing 42_km test from above must still pass with the new scanner
+        const toks = tokenize('test.em', '42_km');
+        const nonEof = toks.filter(t => t.kind !== TokenKind.EOF);
+        assert.strictEqual(nonEof.length, 2);
+        assert.strictEqual(nonEof[0].text, '42');
+        assert.strictEqual(nonEof[1].text, '_km');
+    });
+
+    // --- Enma v1.1: separator rejection / bad placement ---
+    it('trailing separator 1_ leaves _ as next token start', () => {
+        const toks = tokenize('test.em', '1_');
+        const nonEof = toks.filter(t => t.kind !== TokenKind.EOF);
+        // 1 is the number (no consumed _), _ becomes the start of an identifier
+        assert.strictEqual(nonEof[0].kind, TokenKind.Number);
+        assert.strictEqual(nonEof[0].text, '1');
+        assert.strictEqual(nonEof[1].kind, TokenKind.Identifier);
+        assert.strictEqual(nonEof[1].text, '_');
+    });
+
+    it('double separator 1__2 splits as 1 then __2', () => {
+        const toks = tokenize('test.em', '1__2');
+        const nonEof = toks.filter(t => t.kind !== TokenKind.EOF);
+        // 1 (number, _ not followed by digit) then __2 (identifier)
+        assert.strictEqual(nonEof[0].kind, TokenKind.Number);
+        assert.strictEqual(nonEof[0].text, '1');
+        assert.strictEqual(nonEof[1].kind, TokenKind.Identifier);
+        assert.strictEqual(nonEof[1].text, '__2');
+    });
+
+    it('hex separator after prefix 0x_FF rejected (becomes 0x then identifier-ish)', () => {
+        // `_FF` is not a valid identifier start? Actually `_` IS an ident start.
+        // So 0x scans nothing (no hex digit after 0x), then _FF becomes identifier.
+        const toks = tokenize('test.em', '0x_FF');
+        const nonEof = toks.filter(t => t.kind !== TokenKind.EOF);
+        assert.strictEqual(nonEof[0].kind, TokenKind.Number);
+        assert.strictEqual(nonEof[0].text, '0x');
+        assert.strictEqual((nonEof[0] as any).numericKind, 'hex');
+        assert.strictEqual(nonEof[1].kind, TokenKind.Identifier);
+        assert.strictEqual(nonEof[1].text, '_FF');
+    });
 });
