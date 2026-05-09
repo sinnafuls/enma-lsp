@@ -20,6 +20,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as lsp from 'vscode-languageserver/node';
 
 import { TokenObject } from '../compiler_tokenizer/tokenObject';
@@ -392,12 +393,24 @@ export class Inspector {
      */
     private _loadWorkspaceEmFiles(): void {
         if (!this._workspaceRoot) return;
-        let fsRoot = this._workspaceRoot;
-        if (fsRoot.startsWith('file://')) {
-            fsRoot = fsRoot.replace(/^file:\/\//, '').replace(/^\/([A-Za-z]:)/, '$1');
+
+        // Round-trip the workspace URI to a real fs path. Hand-rolled stripping
+        // mishandles the percent-encoded `:` in `file:///d%3A/...` URIs that
+        // VSCode produces on Windows.
+        let fsRoot: string;
+        try {
+            fsRoot = fileURLToPath(this._workspaceRoot);
+        } catch {
+            let s = this._workspaceRoot.replace(/^file:\/\//, '');
+            try { s = decodeURIComponent(s); } catch { /* keep */ }
+            s = s.replace(/^\/([A-Za-z]:)/, '$1');
+            fsRoot = s;
         }
-        try { fsRoot = decodeURIComponent(fsRoot); } catch { /* keep */ }
         fsRoot = fsRoot.replace(/[\\/]+$/, '');
+
+        this._workspaceLogger?.(
+            `[inspector] scanning ${fsRoot} for .em files (implicitMutualInclusion=on)`,
+        );
 
         const exclude = new Set(this._settings.indexExclude);
         const rootUri = this._workspaceRoot;
@@ -405,7 +418,12 @@ export class Inspector {
 
         const walk = (dir: string): void => {
             let entries: string[];
-            try { entries = fs.readdirSync(dir); } catch { return; }
+            try { entries = fs.readdirSync(dir); } catch (err) {
+                this._workspaceLogger?.(
+                    `[inspector] readdir failed for ${dir}: ${(err as Error).message}`,
+                );
+                return;
+            }
             for (const entry of entries) {
                 if (exclude.has(entry)) continue;
                 const full = path.join(dir, entry);
