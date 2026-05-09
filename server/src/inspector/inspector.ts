@@ -100,6 +100,14 @@ export interface InspectRecord {
     diagnosticsInAnalyzer: lsp.Diagnostic[];
     isAnalyzerPending: boolean;
     analyzerScope: AnalyzerScope;
+    /**
+     * Hoist-only scope built without any peer includes — contains only the
+     * symbols this file itself declares. Used by implicitMutualInclusion peer
+     * resolution: pulling `analyzerScope` from peers transitively accumulates
+     * symbols and produces "Symbol X is already declared" collisions when two
+     * files mutually see each other. `ownScope` breaks that cycle.
+     */
+    ownScope?: AnalyzerScope;
     contentHash: string;
     lastAccessed: number;
     isOpen: boolean;
@@ -408,22 +416,13 @@ export class Inspector {
         }
         fsRoot = fsRoot.replace(/[\\/]+$/, '');
 
-        this._workspaceLogger?.(
-            `[inspector] scanning ${fsRoot} for .em files (implicitMutualInclusion=on)`,
-        );
-
         const exclude = new Set(this._settings.indexExclude);
         const rootUri = this._workspaceRoot;
         let count = 0;
 
         const walk = (dir: string): void => {
             let entries: string[];
-            try { entries = fs.readdirSync(dir); } catch (err) {
-                this._workspaceLogger?.(
-                    `[inspector] readdir failed for ${dir}: ${(err as Error).message}`,
-                );
-                return;
-            }
+            try { entries = fs.readdirSync(dir); } catch { return; }
             for (const entry of entries) {
                 if (exclude.has(entry)) continue;
                 const full = path.join(dir, entry);
@@ -444,9 +443,6 @@ export class Inspector {
             }
         };
         walk(fsRoot);
-        this._workspaceLogger?.(
-            `[inspector] indexed ${count} workspace .em file(s) for implicitMutualInclusion`,
-        );
 
         // Two-pass: drain pass-1 analysis synchronously so every record has a
         // populated analyzerScope, then re-queue everything so cross-file

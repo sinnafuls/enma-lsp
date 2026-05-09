@@ -25,7 +25,7 @@ import {
 } from '../compiler_analyzer/analyzerScope';
 import { hoistAfterParsed } from '../compiler_analyzer/hoist';
 import { analyzeAfterHoisted } from '../compiler_analyzer/analyzer';
-import { setActiveGlobalScope } from '../compiler_analyzer/symbolScope';
+import { SymbolGlobalScope, setActiveGlobalScope } from '../compiler_analyzer/symbolScope';
 
 import { AnalysisQueue, Priority } from './analysisQueue';
 import { locationToRange, analyzerDiagToLsp } from './diagnosticUtils';
@@ -215,8 +215,41 @@ export class AnalysisResolver {
 
     private runAnalyzeFor(entry: QueueEntry): void {
         const record = entry.record;
+        const settings = this._getSettings();
+        const predefinedRecords = this._getPredefinedRecords();
 
-        // -------- Build the include scope set --------
+        // -------- Step 1: own-only scope --------
+        // Hoist with NO peer scopes so `record.ownScope` contains only the
+        // symbols this file itself declares. Implicit mutual inclusion uses
+        // peer ownScopes to avoid the transitive-symbol cycle that arises
+        // when every file is everyone else's peer.
+        analyzerDiagnostic.beginSession();
+        const ownGlobalScope = new SymbolGlobalScope(record.uri);
+        setActiveGlobalScope(ownGlobalScope);
+        if (predefinedRecords.length > 0) {
+            mergePredefinedIntoScope(ownGlobalScope, predefinedRecords);
+        }
+        try {
+            hoistAfterParsed(record.ast, ownGlobalScope);
+            record.ownScope = new AnalyzerScope(record.uri, ownGlobalScope);
+        } catch {
+            // Hoist failures surface in step 2 with full context.
+        }
+        analyzerDiagnostic.endSession();
+
+        // -------- Step 2: full scope (peers + own) --------
+        // Under implicit mutual inclusion every peer (explicit-include or not)
+        // uses its `ownScope`. Transitive visibility is already provided by
+        // the implicit peer-scan, and pulling `analyzerScope` instead would
+        // re-import this file's own symbols via a peer that previously
+        // absorbed them — yielding "Symbol X is already declared" cascades
+        // when a bundle-entry file (#includes everything) declares globals.
+        const useOwnScopeForPeers = settings?.implicitMutualInclusion === true;
+        const peerScope = (other: InspectRecord): AnalyzerScope =>
+            useOwnScopeForPeers
+                ? (other.ownScope ?? other.analyzerScope)
+                : other.analyzerScope;
+
         const includeScopes: AnalyzerScope[] = [];
         const seen = new Set<string>();
         for (const importUri of record.importGraph.imports) {
@@ -224,28 +257,22 @@ export class AnalysisResolver {
             seen.add(importUri);
             const imported = this._records.get(importUri);
             if (imported === undefined) continue;
-            includeScopes.push(imported.analyzerScope);
+            includeScopes.push(peerScope(imported));
         }
 
-        // Implicit mutual inclusion: every other indexed .em record is visible.
-        const settings = this._getSettings();
-        if (settings?.implicitMutualInclusion) {
+        if (useOwnScopeForPeers) {
             for (const [uri, other] of this._records) {
                 if (uri === record.uri) continue;
                 if (seen.has(uri)) continue;
                 seen.add(uri);
-                includeScopes.push(other.analyzerScope);
+                includeScopes.push(peerScope(other));
             }
         }
 
-        // -------- Run hoist + analyze in a fresh diagnostic session ----
         analyzerDiagnostic.beginSession();
-
         const globalScope = createGlobalScope(record.uri, includeScopes);
         setActiveGlobalScope(globalScope);
 
-        // -------- §A10 Merge predefined records into scope --------
-        const predefinedRecords = this._getPredefinedRecords();
         const collisionDiags = predefinedRecords.length > 0
             ? mergePredefinedIntoScope(globalScope, predefinedRecords)
             : [];
@@ -255,7 +282,6 @@ export class AnalysisResolver {
             const analyzerScope = analyzeAfterHoisted(record.uri, hoistResult);
             record.analyzerScope = analyzerScope;
         } catch (err) {
-            // Defensive: a thrown analyzer error must not crash the LSP.
             analyzerDiagnostic.error(
                 {
                     uri: record.uri,

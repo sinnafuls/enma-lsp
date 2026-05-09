@@ -224,4 +224,87 @@ describe('Inspector — multi-file indexing', () => {
         assert.equal(after.length, 0,
             `expected color_t to resolve under implicit mutual inclusion; got ${JSON.stringify(sentDiags.get(elemUri))}`);
     });
+
+    it('implicitMutualInclusion: bundle entry that #includes everything and declares its own globals does not collide with itself', () => {
+        // Models main.em: a bundle-entry file that explicitly #includes
+        // every other file AND declares top-level globals. Under naive peer
+        // resolution, the included files' analyzerScopes have absorbed
+        // main.em's own globals via the implicit peer-scan, so when main.em
+        // pulls them through its #include path, hoist sees its own globals
+        // and emits "Symbol X is already declared" against main.em itself.
+        const { inspector, sentDiags } = makeInspector();
+        const mainUri = uriFor('main.em');
+        const colorUri = uriFor('utility/types/color.em');
+        const elemUri = uriFor('utility/rendering/elements.em');
+
+        inspector.inspectFile(
+            colorUri,
+            `class color_t {\n    uint8 r; uint8 g; uint8 b; uint8 a;\n}\n`,
+            { isOpen: false });
+        inspector.inspectFile(
+            elemUri,
+            `void draw(color_t c) { }\n`,
+            { isOpen: false });
+        inspector.inspectFile(
+            mainUri,
+            `#include "utility/types/color.em"\n` +
+            `#include "utility/rendering/elements.em"\n` +
+            `uint64 g_load_time = 0;\n` +
+            `bool g_successfully_loaded = false;\n` +
+            `string g_Username = "unknown";\n` +
+            `int64 main() { return 1; }\n`,
+            { isOpen: true });
+        inspector.updateSettings({ implicitMutualInclusion: true });
+        inspector.flush();
+        inspector.reinspectAllFiles();
+        inspector.flush();
+
+        const dups = (sentDiags.get(mainUri) ?? []).filter(d =>
+            d.severity === lsp.DiagnosticSeverity.Error &&
+            /already declared/.test(d.message));
+        assert.equal(dups.length, 0,
+            `main.em should not redeclare its own globals through includes; got ${JSON.stringify(dups.map(d => d.message))}`);
+    });
+
+    it('implicitMutualInclusion does not redeclare a file\'s own symbols via transitive peers', () => {
+        // Three files, all visible to each other under implicit mutual:
+        //   color.em declares color_t.
+        //   elements.em uses color_t.
+        //   bones.em is unrelated but indexed.
+        // Without the ownScope split, color.em pass-2 would pull
+        // elements.em's analyzerScope (which already absorbed color_t from a
+        // prior pass) and emit "Symbol 'color_t' is already declared".
+        const { inspector, sentDiags } = makeInspector();
+        const colorUri = uriFor('utility/types/color.em');
+        const elemUri = uriFor('utility/rendering/elements.em');
+        const boneUri = uriFor('utility/types/bones.em');
+
+        inspector.inspectFile(
+            colorUri,
+            `class color_t {\n    uint8 r; uint8 g; uint8 b; uint8 a;\n}\n`,
+            { isOpen: true });
+        inspector.inspectFile(
+            elemUri,
+            `void draw(color_t c) { }\n`,
+            { isOpen: true });
+        inspector.inspectFile(
+            boneUri,
+            `class bone_t {\n    int64 idx;\n}\n`,
+            { isOpen: true });
+        inspector.updateSettings({ implicitMutualInclusion: true });
+        inspector.flush();
+        // Force a second drain so every file analyzes against fully-populated
+        // peer ownScopes — this is what reinspectAllFiles does after a
+        // workspace .em scan settles.
+        inspector.reinspectAllFiles();
+        inspector.flush();
+
+        for (const u of [colorUri, elemUri, boneUri]) {
+            const dups = (sentDiags.get(u) ?? []).filter(d =>
+                d.severity === lsp.DiagnosticSeverity.Error &&
+                /already declared/.test(d.message));
+            assert.equal(dups.length, 0,
+                `${u} should not see its own symbols redeclared via peers; got ${JSON.stringify(dups)}`);
+        }
+    });
 });

@@ -118,16 +118,11 @@ async function applyEnmaConfiguration(): Promise<void> {
     let cfg: { implicitMutualInclusion?: boolean } | undefined;
     try {
         cfg = await connection.workspace.getConfiguration('enma');
-    } catch (err) {
-        connection.console.log(`[server] getConfiguration('enma') failed: ${(err as Error).message}`);
+    } catch {
         return;
     }
-    if (cfg === undefined || cfg === null) {
-        connection.console.log(`[server] getConfiguration('enma') returned ${cfg}`);
-        return;
-    }
+    if (cfg === undefined || cfg === null) return;
     const flag = cfg.implicitMutualInclusion === true;
-    connection.console.log(`[server] enma.implicitMutualInclusion = ${flag}`);
     if (flag !== inspector.getSettings().implicitMutualInclusion) {
         inspector.updateSettings({ implicitMutualInclusion: flag });
     }
