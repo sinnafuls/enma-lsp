@@ -31,9 +31,9 @@ import {
 
 interface ProjectConfig {
     name: string;
-    src: string;
-    out: string;
-    strip?: boolean;
+    sourceDirectory: string;
+    outputFile: string;
+    stripComments?: boolean;
 }
 
 interface BundleTaskDefinition extends TaskDefinition {
@@ -106,7 +106,7 @@ function readProjects(): ProjectConfig[] {
 function readBundlerSettings(): { src: string; out: string; strip: boolean } {
     const cfg = workspace.getConfiguration('enma.bundler');
     return {
-        src: cfg.get<string>('sourceDirectory', 'source') + '/main.em',
+        src: cfg.get<string>('sourceDirectory', 'source'),
         out: cfg.get<string>('outputFile', 'output/bundled.em'),
         strip: cfg.get<boolean>('stripComments', true),
     };
@@ -124,16 +124,16 @@ async function cmdBundle(context: ExtensionContext, forceStrip?: boolean): Promi
         window.showErrorMessage('Enma: open a workspace folder first.');
         return;
     }
-    if (!fs.existsSync(src)) {
+    if (!fs.existsSync(src) || !fs.statSync(src).isDirectory()) {
         const pick = await window.showWarningMessage(
-            `Enma: source entry not found at ${src}. Pick a different file?`,
-            'Pick file', 'Cancel',
+            `Enma: source directory not found at ${src}. Pick a different directory?`,
+            'Pick directory', 'Cancel',
         );
-        if (pick !== 'Pick file') return;
+        if (pick !== 'Pick directory') return;
         const chosen = await window.showOpenDialog({
-            canSelectFiles: true,
+            canSelectFiles: false,
+            canSelectFolders: true,
             canSelectMany: false,
-            filters: { Enma: ['em'] },
         });
         if (!chosen || chosen.length === 0) return;
         await runBundler(context, chosen[0].fsPath, out, forceStrip ?? settings.strip);
@@ -151,14 +151,18 @@ async function cmdBundleProject(context: ExtensionContext): Promise<void> {
         return;
     }
     const pick = await window.showQuickPick(
-        projects.map(p => ({ label: p.name, description: `${p.src} → ${p.out}`, project: p })),
+        projects.map(p => ({
+            label: p.name,
+            description: `${p.sourceDirectory} → ${p.outputFile}`,
+            project: p,
+        })),
         { placeHolder: 'Pick an Enma project to bundle' },
     );
     if (!pick) return;
-    const src = resolveAgainstRoot(pick.project.src);
-    const out = resolveAgainstRoot(pick.project.out);
+    const src = resolveAgainstRoot(pick.project.sourceDirectory);
+    const out = resolveAgainstRoot(pick.project.outputFile);
     if (!src || !out) return;
-    await runBundler(context, src, out, !!pick.project.strip);
+    await runBundler(context, src, out, !!pick.project.stripComments);
 }
 
 async function cmdBundleAll(context: ExtensionContext): Promise<void> {
@@ -170,11 +174,11 @@ async function cmdBundleAll(context: ExtensionContext): Promise<void> {
         return;
     }
     for (const p of projects) {
-        const src = resolveAgainstRoot(p.src);
-        const out = resolveAgainstRoot(p.out);
+        const src = resolveAgainstRoot(p.sourceDirectory);
+        const out = resolveAgainstRoot(p.outputFile);
         if (!src || !out) continue;
         try {
-            await runBundler(context, src, out, !!p.strip);
+            await runBundler(context, src, out, !!p.stripComments);
         } catch (e) {
             getOutput().appendLine(`[bundler] project '${p.name}' failed: ${(e as Error).message}`);
         }
@@ -204,7 +208,7 @@ async function cmdInitProject(): Promise<void> {
                 {
                     label: 'Enma: bundle',
                     type: 'enma-bundle',
-                    src: 'source/main.em',
+                    src: 'source',
                     out: 'output/bundled.em',
                     strip: false,
                     problemMatcher: [],

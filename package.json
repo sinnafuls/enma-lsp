@@ -345,7 +345,7 @@
         "enma.bundler.sourceDirectory": {
           "type": "string",
           "default": "source",
-          "description": "Workspace-relative directory containing the bundler entry file (main.em)."
+          "description": "Workspace-relative directory of .em sources to bundle. Every .em file under this directory ships; #include directives only affect ordering."
         },
         "enma.bundler.outputFile": {
           "type": "string",
@@ -360,27 +360,31 @@
         "enma.projects": {
           "type": "array",
           "default": [],
-          "description": "List of bundler projects. Each project: { name, src, out, strip? }.",
+          "description": "Define multiple Enma projects within a single workspace. Each project has its own source directory and output file.",
           "items": {
             "type": "object",
             "required": [
               "name",
-              "src",
-              "out"
+              "sourceDirectory",
+              "outputFile"
             ],
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "description": "Display name for this project."
               },
-              "src": {
-                "type": "string"
+              "sourceDirectory": {
+                "type": "string",
+                "description": "Source directory for this project's .em files (relative to workspace root)."
               },
-              "out": {
-                "type": "string"
+              "outputFile": {
+                "type": "string",
+                "description": "Output file path for the bundled script (relative to workspace root)."
               },
-              "strip": {
+              "stripComments": {
                 "type": "boolean",
-                "default": false
+                "default": false,
+                "description": "Whether to strip comments when bundling this project."
               }
             }
           }
