@@ -1160,18 +1160,10 @@ class Parser {
             do {
                 generics.push(this.parseType());
             } while (this.s.matchOp(','));
-            // Closing '>' — could be tokenized as '>>' if we have nested generics. Best-effort handling.
-            if (!this.s.matchOp('>')) {
-                // Try to handle '>>' as two '>'
-                const t = this.s.peek();
-                if (t && t.kind === TokenKind.Operator && t.text === '>>') {
-                    // Consume and synthesize the second '>': we leave it by mutating? Easier: skip & rely on caller.
-                    this.s.advance();
-                    // Re-emit a single '>' by NOT advancing again — caller's outer parseType will see the
-                    // synthesized close. Push a sentinel via state? Simplest: just accept and move on.
-                } else {
-                    this.s.error(`expected '>' to close type args`, this.s.peek()?.location ?? this.s.endLocation());
-                }
+            // Closing '>' — handled via matchCloseAngle which transparently splits '>>'
+            // (right-shift) into two '>'s for nested generics like array<array<T>>.
+            if (!this.s.matchCloseAngle()) {
+                this.s.error(`expected '>' to close type args`, this.s.peek()?.location ?? this.s.endLocation());
             }
         }
         let pointerLevel = 0;
@@ -2221,16 +2213,7 @@ class Parser {
         } catch {
             return null;
         }
-        if (!this.s.matchOp('>')) {
-            // Try '>>' split
-            const t = this.s.peek();
-            if (t && t.kind === TokenKind.Operator && t.text === '>>') {
-                // accept; treat as one '>'
-                this.s.advance();
-            } else {
-                return null;
-            }
-        }
+        if (!this.s.matchCloseAngle()) return null;
         if (!this.s.check(TokenKind.Punctuation, '(')) return null;
         this.s.advance();
         const args: NodeExpr[] = [];

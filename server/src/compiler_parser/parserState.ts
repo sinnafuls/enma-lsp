@@ -78,6 +78,30 @@ export class ParserState {
         return this.match(TokenKind.Operator, text);
     }
 
+    /** Match a closing '>' for type-args / template-params, transparently splitting
+     *  a '>>' (right-shift) token when the tokenizer merged two consecutive '>'s.
+     *  On '>>' we mutate the token in place to a single '>' covering the second
+     *  column without advancing — the outer scope's matchCloseAngle()/matchOp('>')
+     *  call will then consume the leftover. Returns true if a '>' was matched. */
+    matchCloseAngle(): boolean {
+        const t = this.peek();
+        if (!t || t.kind !== TokenKind.Operator) return false;
+        if (t.text === '>') { this.advance(); return true; }
+        if (t.text === '>>') {
+            const start = t.location.start;
+            const end = t.location.end;
+            const mid = createPosition(start.line, start.character + 1);
+            const second: TokenObject = {
+                kind: TokenKind.Operator,
+                text: '>',
+                location: { uri: t.location.uri, start: mid, end },
+            };
+            (this._tokens as TokenObject[])[this._pos] = second;
+            return true;
+        }
+        return false;
+    }
+
     /** Check current token text equals the given text (regardless of kind, for keyword-or-op punctuation). */
     checkText(text: string): boolean {
         const t = this.peek();

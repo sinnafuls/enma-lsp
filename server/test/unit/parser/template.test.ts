@@ -32,4 +32,30 @@ describe('Parser — templates', () => {
         assert.strictEqual(fn.params[0].type.path[0].text, 'array');
         assert.strictEqual(fn.params[0].type.generics.length, 1);
     });
+
+    it('parses nested generic types closed by a single >> token', () => {
+        // The tokenizer emits '>>' as a right-shift operator; the parser must
+        // split it back into two '>'s when closing nested type-args.
+        const r = parseSource(`
+            class CChestBuffer {
+                array<array<chest_t*>> buffers;
+                array<array<array<int32>>> cube;
+            }
+        `);
+        assert.strictEqual(parserErrors(r.diagnostics).length, 0,
+            parserErrors(r.diagnostics).map(d => d.message).join('\n'));
+        const cls = r.ast.children[0] as any;
+        const buffers = cls.members[0];
+        assert.strictEqual(buffers.type.path[0].text, 'array');
+        assert.strictEqual(buffers.type.generics.length, 1);
+        assert.strictEqual(buffers.type.generics[0].path[0].text, 'array');
+    });
+
+    it('parses generic type-args inside an explicit template call', () => {
+        const r = parseSource(`
+            void f() { make<array<int32>>(); }
+        `);
+        assert.strictEqual(parserErrors(r.diagnostics).length, 0,
+            parserErrors(r.diagnostics).map(d => d.message).join('\n'));
+    });
 });
