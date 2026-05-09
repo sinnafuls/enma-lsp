@@ -85,6 +85,8 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
 
 connection.onInitialized(() => {
     connection.console.log('Enma Language Server initialized.');
+    // Pull initial settings from the editor and apply them.
+    void applyEnmaConfiguration();
     // Multi-root: re-load workspace predefined when a new root is added.
     connection.workspace.onDidChangeWorkspaceFolders((event) => {
         if (event.added.length === 0) return;
@@ -109,9 +111,22 @@ documents.onDidClose((event) => {
 });
 
 connection.onDidChangeConfiguration(() => {
-    // Settings re-read can be wired here in a future iteration; settings
-    // updates flow through the inspector's updateSettings + reinspectAllFiles.
+    void applyEnmaConfiguration();
 });
+
+async function applyEnmaConfiguration(): Promise<void> {
+    let cfg: { implicitMutualInclusion?: boolean } | undefined;
+    try {
+        cfg = await connection.workspace.getConfiguration('enma');
+    } catch {
+        return;
+    }
+    if (cfg === undefined || cfg === null) return;
+    const flag = cfg.implicitMutualInclusion === true;
+    if (flag !== inspector.getSettings().implicitMutualInclusion) {
+        inspector.updateSettings({ implicitMutualInclusion: flag });
+    }
+}
 
 // ---- Helpers -----------------------------------------------------------
 

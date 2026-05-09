@@ -29,7 +29,7 @@ import { setActiveGlobalScope } from '../compiler_analyzer/symbolScope';
 
 import { AnalysisQueue, Priority } from './analysisQueue';
 import { locationToRange, analyzerDiagToLsp } from './diagnosticUtils';
-import type { InspectRecord } from './inspector';
+import type { InspectRecord, InspectorSettings } from './inspector';
 import {
     PredefinedRecord,
     mergePredefinedIntoScope,
@@ -66,6 +66,9 @@ export class AnalysisResolver {
     /** Getter for current predefined records; injected by Inspector. */
     private _getPredefinedRecords: () => readonly PredefinedRecord[] = () => [];
 
+    /** Getter for current inspector settings; injected by Inspector. */
+    private _getSettings: () => InspectorSettings | undefined = () => undefined;
+
     public constructor(
         private readonly _records: Map<string, InspectRecord>,
         private readonly _diagnosticsCallback: DiagnosticsCallback,
@@ -77,6 +80,10 @@ export class AnalysisResolver {
 
     public setPredefinedRecordsGetter(getter: () => readonly PredefinedRecord[]): void {
         this._getPredefinedRecords = getter;
+    }
+
+    public setSettingsGetter(getter: () => InspectorSettings): void {
+        this._getSettings = getter;
     }
 
     public setWorkspaceRoot(uri: string): void {
@@ -220,6 +227,17 @@ export class AnalysisResolver {
             includeScopes.push(imported.analyzerScope);
         }
 
+        // Implicit mutual inclusion: every other indexed .em record is visible.
+        const settings = this._getSettings();
+        if (settings?.implicitMutualInclusion) {
+            for (const [uri, other] of this._records) {
+                if (uri === record.uri) continue;
+                if (seen.has(uri)) continue;
+                seen.add(uri);
+                includeScopes.push(other.analyzerScope);
+            }
+        }
+
         // -------- Run hoist + analyze in a fresh diagnostic session ----
         analyzerDiagnostic.beginSession();
 
@@ -275,6 +293,14 @@ export class AnalysisResolver {
                 const r = this._records.get(cur);
                 if (r === undefined) continue;
                 stack.push(...r.importGraph.importedBy);
+            }
+            // Under implicit mutual inclusion every other open record is also a dependent.
+            if (settings?.implicitMutualInclusion) {
+                for (const [uri, r] of this._records) {
+                    if (uri === record.uri) continue;
+                    if (!r.isOpen) continue;
+                    deps.add(uri);
+                }
             }
             for (const dep of deps) {
                 const r = this._records.get(dep);

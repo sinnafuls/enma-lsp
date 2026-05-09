@@ -18,6 +18,7 @@
 // 300). On eviction we ZERO the analyzerScope (cheap to rebuild from ast)
 // but RETAIN content+rawTokens+ast to keep simple lookups fast.
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as lsp from 'vscode-languageserver/node';
 
@@ -270,6 +271,7 @@ export class Inspector {
             (params) => this._diagnosticsCallback(params),
         );
         this._resolver.setPredefinedRecordsGetter(() => this._predefinedRecords);
+        this._resolver.setSettingsGetter(() => this._settings);
         this._loadBundledPredefined();
     }
 
@@ -284,6 +286,10 @@ export class Inspector {
         this._resolver.setWorkspaceRoot(this._workspaceRoot);
         // Scan workspace for .em.predefined files.
         this._loadWorkspacePredefined();
+        // Scan workspace for .em files when implicit mutual inclusion is enabled.
+        if (this._settings.implicitMutualInclusion) {
+            this._loadWorkspaceEmFiles();
+        }
     }
 
 
@@ -374,6 +380,65 @@ export class Inspector {
         ];
     }
 
+    /**
+     * Scan the workspace for `.em` files and seed an InspectRecord for each.
+     * Used when `implicitMutualInclusion` is enabled so files that are not
+     * currently open in the editor are still part of the cross-file scope set.
+     *
+     * URIs are derived by appending the relative path onto `_workspaceRoot`
+     * (which already carries VSCode's URI form), so when the user later opens
+     * the same file in the editor the existing record is updated in place
+     * rather than a duplicate being created.
+     */
+    private _loadWorkspaceEmFiles(): void {
+        if (!this._workspaceRoot) return;
+        let fsRoot = this._workspaceRoot;
+        if (fsRoot.startsWith('file://')) {
+            fsRoot = fsRoot.replace(/^file:\/\//, '').replace(/^\/([A-Za-z]:)/, '$1');
+        }
+        try { fsRoot = decodeURIComponent(fsRoot); } catch { /* keep */ }
+        fsRoot = fsRoot.replace(/[\\/]+$/, '');
+
+        const exclude = new Set(this._settings.indexExclude);
+        const rootUri = this._workspaceRoot;
+        let count = 0;
+
+        const walk = (dir: string): void => {
+            let entries: string[];
+            try { entries = fs.readdirSync(dir); } catch { return; }
+            for (const entry of entries) {
+                if (exclude.has(entry)) continue;
+                const full = path.join(dir, entry);
+                let stat: fs.Stats;
+                try { stat = fs.statSync(full); } catch { continue; }
+                if (stat.isDirectory()) {
+                    walk(full);
+                    continue;
+                }
+                if (!entry.endsWith('.em') || entry.endsWith('.em.predefined')) continue;
+                const rel = path.relative(fsRoot, full).replace(/\\/g, '/');
+                const fileUri = normalizeUri(rootUri + rel);
+                if (this._records.has(fileUri)) continue;
+                let content: string;
+                try { content = fs.readFileSync(full, 'utf8'); } catch { continue; }
+                this.inspectFile(fileUri, content, { isOpen: false });
+                count++;
+            }
+        };
+        walk(fsRoot);
+        this._workspaceLogger?.(
+            `[inspector] indexed ${count} workspace .em file(s) for implicitMutualInclusion`,
+        );
+
+        // Two-pass: drain pass-1 analysis synchronously so every record has a
+        // populated analyzerScope, then re-queue everything so cross-file
+        // references resolve against the now-complete scope set.
+        if (count > 0) {
+            this._resolver.flush();
+            this.reinspectAllFiles();
+        }
+    }
+
     /** Optional log sink wired by server.ts to surface predefined-loading
      *  progress in the editor's "Output → Enma Language Server" channel. */
     public setLogger(logger: (msg: string) => void): void {
@@ -383,11 +448,21 @@ export class Inspector {
 
     public updateSettings(partial: Partial<InspectorSettings>): void {
         const hadForce = JSON.stringify(this._settings.forceIncludePredefined);
+        const wasImplicitMutual = this._settings.implicitMutualInclusion;
         this._settings = { ...this._settings, ...partial };
         // If forceIncludePredefined changed, reload.
         if (partial.forceIncludePredefined !== undefined &&
             JSON.stringify(partial.forceIncludePredefined) !== hadForce) {
             this._loadForceIncludePredefined();
+        }
+        // If implicitMutualInclusion just turned on, scan workspace .em files
+        // so types declared anywhere in the workspace become visible.
+        if (partial.implicitMutualInclusion === true && !wasImplicitMutual) {
+            this._loadWorkspaceEmFiles();
+            this.reinspectAllFiles();
+        } else if (partial.implicitMutualInclusion === false && wasImplicitMutual) {
+            // Turning the flag off changes scope visibility; re-analyze.
+            this.reinspectAllFiles();
         }
     }
 
