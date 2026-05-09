@@ -194,4 +194,34 @@ describe('Inspector — multi-file indexing', () => {
         inspector.reset();
         assert.equal(inspector.getAllRecords().length, 0);
     });
+
+    it('implicitMutualInclusion makes types from un-included files visible', () => {
+        const { inspector, sentDiags } = makeInspector();
+        const colorUri = uriFor('utility/types/color.em');
+        const elemUri = uriFor('utility/rendering/elements.em');
+
+        const colorSrc = `class color_t {\n    uint8 r; uint8 g; uint8 b; uint8 a;\n}\n`;
+        const elemSrc = `void draw(color_t c) { }\n`;
+
+        inspector.inspectFile(colorUri, colorSrc, { isOpen: false });
+        inspector.inspectFile(elemUri, elemSrc, { isOpen: true });
+        inspector.flush();
+
+        const before = (sentDiags.get(elemUri) ?? []).filter(d =>
+            d.severity === lsp.DiagnosticSeverity.Error &&
+            /color_t/.test(d.message));
+        assert.ok(before.length > 0,
+            `expected color_t to be unknown without implicit mutual inclusion; got ${JSON.stringify(sentDiags.get(elemUri))}`);
+
+        // Flip the flag — without scanning fs we just need the resolver to
+        // pull peer scopes for already-indexed records.
+        inspector.updateSettings({ implicitMutualInclusion: true });
+        inspector.flush();
+
+        const after = (sentDiags.get(elemUri) ?? []).filter(d =>
+            d.severity === lsp.DiagnosticSeverity.Error &&
+            /color_t/.test(d.message));
+        assert.equal(after.length, 0,
+            `expected color_t to resolve under implicit mutual inclusion; got ${JSON.stringify(sentDiags.get(elemUri))}`);
+    });
 });
