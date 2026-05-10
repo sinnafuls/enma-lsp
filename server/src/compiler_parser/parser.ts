@@ -191,6 +191,7 @@ const ASSIGN_OPS = new Set(['=', '+=', '-=', '*=', '/=', '%=', '<<=', '>>=', '&=
 const MODIFIERS = new Set([
     'static', 'const', 'constexpr', 'inline', 'override',
     'public', 'private', 'volatile',
+    'virtual', 'final', 'friend',
 ]);
 
 const TYPE_PREFIX_KW = new Set(['const', 'nullable']);
@@ -575,9 +576,11 @@ class Parser {
         return bases;
     }
 
-    // BNF: Enum ::= 'enum' <ID> [ ':' Type ] '{' EnumValueList [ ',' ] '}'
+    // BNF: Enum ::= 'enum' [ 'class' | 'struct' ] <ID> [ ':' Type ] '{' EnumValueList [ ',' ] '}'
     private parseEnum(annotations: NodeAnnotation[]): NodeEnum | null {
         const kw = this.s.advance()!;
+        // Optional C++-style scoped-enum keyword: `enum class Name` / `enum struct Name`.
+        this.s.matchReserved('class') || this.s.matchReserved('struct');
         const name = this.s.expectIdentifier(`expected enum name`);
         if (!name) { this.s.panicRecover(); return null; }
         let underlying: NodeType | null = null;

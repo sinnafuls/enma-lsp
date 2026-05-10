@@ -59,6 +59,23 @@ describe('Parser — class / struct / interface (§A3 multi-inheritance)', () =>
         assert.ok(m.modifiers.some((mod: any) => mod.text === 'override'));
     });
 
+    it('parses virtual / final / friend modifiers on methods', () => {
+        const r = parseSource(`
+            class V {
+                virtual void accept(string row) { rows++; }
+                final int32 f() { return 1; }
+                friend void g();
+            }
+        `);
+        assert.strictEqual(parserErrors(r.diagnostics).length, 0);
+        const cls = r.ast.children[0] as any;
+        const methods = cls.members.filter((mm: any) => mm.kind === NodeKind.Method);
+        assert.strictEqual(methods.length, 3);
+        assert.ok(methods[0].modifiers.some((m: any) => m.text === 'virtual'));
+        assert.ok(methods[1].modifiers.some((m: any) => m.text === 'final'));
+        assert.ok(methods[2].modifiers.some((m: any) => m.text === 'friend'));
+    });
+
     it('parses interface with method declarations', () => {
         const r = parseSource(`
             interface Drawable {
@@ -74,6 +91,22 @@ describe('Parser — class / struct / interface (§A3 multi-inheritance)', () =>
             assert.strictEqual(m.kind, NodeKind.Method);
             assert.strictEqual(m.body, null);
         }
+    });
+
+    it('parses scoped enum (`enum class` / `enum struct`)', () => {
+        const a = parseSource(`enum class CaptureKind { None = 0, Aim = 1, Ballistic = 2 }`);
+        assert.strictEqual(parserErrors(a.diagnostics).length, 0);
+        const ea = a.ast.children[0] as any;
+        assert.strictEqual(ea.kind, NodeKind.Enum);
+        assert.strictEqual(ea.name.text, 'CaptureKind');
+        assert.strictEqual(ea.values.length, 3);
+
+        const b = parseSource(`enum struct Foo { A, B }`);
+        assert.strictEqual(parserErrors(b.diagnostics).length, 0);
+        assert.strictEqual((b.ast.children[0] as any).name.text, 'Foo');
+
+        const plain = parseSource(`enum Plain { X = 1 }`);
+        assert.strictEqual(parserErrors(plain.diagnostics).length, 0);
     });
 
     it('parses struct with annotations', () => {
