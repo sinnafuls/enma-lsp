@@ -134,6 +134,8 @@ export interface NodeType extends NodeBase {
     readonly isConst: boolean;
     /** nullable T */
     readonly isNullable: boolean;
+    /** `decltype(expr)` form — when set, `path` holds a synthetic 'decltype' token. */
+    readonly decltypeExpr?: NodeExpr;
 }
 
 export interface NodeAnnotation extends NodeBase {
@@ -189,6 +191,8 @@ export type NodeTopLevel =
 export interface NodeImport extends NodeBase {
     readonly kind: NodeKind.Import;
     readonly path: TokenString;
+    /** Optional `as <ID>` alias for namespace-style scoping at use sites. */
+    readonly alias: TokenIdentifier | null;
 }
 
 export interface NodeUsing extends NodeBase {
@@ -248,6 +252,8 @@ export interface NodeOperatorOverload extends NodeBase {
     readonly op: TokenObject;
     readonly params: ReadonlyArray<NodeParam>;
     readonly body: NodeStmtBlock;
+    readonly annotations?: ReadonlyArray<NodeAnnotation>;
+    readonly modifiers?: ReadonlyArray<TokenReserved>;
 }
 
 // ---- Class / Struct / Interface members ----
@@ -316,6 +322,8 @@ export interface NodeField extends NodeBase {
     readonly initializer: NodeExpr | null;
     readonly annotations: ReadonlyArray<NodeAnnotation>;
     readonly modifiers: ReadonlyArray<TokenReserved>;
+    /** Bitfield width: `uint32 ready : 1;` → bitWidth holds the `1` expression. */
+    readonly bitWidth?: NodeExpr | null;
 }
 
 export interface NodeMethod extends NodeBase {
@@ -335,6 +343,11 @@ export interface NodeConstructor extends NodeBase {
     readonly params: ReadonlyArray<NodeParam>;
     readonly body: NodeStmtBlock | null;       // null for declaration-only (predefined files)
     readonly annotations: ReadonlyArray<NodeAnnotation>;
+    /** Constructor init list: `: Base(args), Other::Base(args)`. */
+    readonly initList?: ReadonlyArray<{
+        readonly base: ReadonlyArray<TokenIdentifier | TokenReserved>;
+        readonly args: ReadonlyArray<NodeExpr>;
+    }>;
 }
 
 export interface NodeDestructor extends NodeBase {
@@ -409,6 +422,8 @@ export interface NodeStmtIf extends NodeBase {
     readonly condition: NodeExpr;
     readonly thenBranch: NodeStmt;
     readonly elseBranch: NodeStmt | null;
+    /** C++17 if-init clause: `if (T x = expr; cond)`. */
+    readonly init?: NodeStmtVar | NodeStmtExpr | null;
 }
 
 export interface NodeStmtFor extends NodeBase {

@@ -271,6 +271,13 @@ class Parser {
         if (this.isReserved(t, 'enum')) return this.parseEnum(annotations);
         if (this.isReserved(t, 'extern')) return this.parseExternDecl(annotations);
         if (this.isReserved(t, 'coroutine')) return this.parseCoroutine(annotations);
+        // Module-scope `static_assert(...);`. NodeTopLevel has no wrapper for free
+        // expressions, so we parse and drop — error-free is enough for the LSP.
+        if (this.isReserved(t, 'static_assert')) {
+            this.parseStaticAssert();
+            this.s.expectPunct(';', `expected ';' after module-scope static_assert`);
+            return null;
+        }
 
         // Otherwise: function or variable declaration.
         return this.parseFunctionOrVar(annotations);
@@ -317,7 +324,7 @@ class Parser {
         };
     }
 
-    // BNF: Import ::= 'import' STRING ';'
+    // BNF: Import ::= 'import' STRING [ 'as' <ID> ] ';'
     private parseImport(): NodeImport | null {
         const kw = this.s.advance()!; // 'import'
         const pathTok = this.s.peek();
@@ -327,11 +334,21 @@ class Parser {
             return null;
         }
         this.s.advance();
+        // Optional `as <ID>` alias clause (e.g. `import "foo.em" as foo;`).
+        // `as` is a contextual identifier, not a reserved word.
+        let alias: TokenIdentifier | null = null;
+        const asTok = this.s.peek();
+        if (asTok && asTok.kind === TokenKind.Identifier && asTok.text === 'as') {
+            this.s.advance();
+            const aliasTok = this.s.expectIdentifier(`expected alias name after 'as'`);
+            if (aliasTok) alias = aliasTok as TokenIdentifier;
+        }
         this.s.expectPunct(';', `expected ';' after import path`);
         return {
             kind: NodeKind.Import,
             range: this.s.rangeFromTokens(kw),
             path: pathTok as TokenString,
+            alias,
         };
     }
 
@@ -472,9 +489,13 @@ class Parser {
     }
 
     // BNF: Mixin ::= 'mixin' <ID> [ ':' BaseList ] '{' { Member } '}'
+    //             |  'mixin' Type QualifiedName '(' Params ')' Block       // method-form
     private parseMixin(_annotations: NodeAnnotation[]): NodeMixin | null {
         void _annotations;
         const kw = this.s.advance()!;
+        if (this.looksLikeMethodMixin()) {
+            return this.parseMethodMixin(kw);
+        }
         const name = this.s.expectIdentifier(`expected mixin name`);
         if (!name) { this.s.panicRecover(); return null; }
         const bases = this.s.matchOp(':') ? this.parseBaseList() : [];
@@ -487,6 +508,80 @@ class Parser {
             name: name as TokenIdentifier,
             bases,
             members,
+        };
+    }
+
+    /** True when the upcoming tokens look like `Type Owner::name(...)` (method-form mixin). */
+    private looksLikeMethodMixin(): boolean {
+        let depth = 0;
+        for (let i = 0; i < 256; i++) {
+            const t = this.s.peek(i);
+            if (!t) return false;
+            if (t.kind === TokenKind.Punctuation) {
+                if (t.text === '(' || t.text === '[' || t.text === '{') {
+                    if (depth === 0 && (t.text === '{' || t.text === '(')) return false;
+                    depth++;
+                } else if (t.text === ')' || t.text === ']' || t.text === '}') {
+                    if (depth === 0) return false;
+                    depth--;
+                } else if (t.text === ';' && depth === 0) {
+                    return false;
+                }
+            }
+            if (t.kind === TokenKind.Operator) {
+                if (t.text === '<') depth++;
+                else if (t.text === '>') { if (depth > 0) depth--; }
+                else if (t.text === '>>') { depth = Math.max(0, depth - 2); }
+                else if (t.text === '::' && depth === 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private parseMethodMixin(kw: TokenObject): NodeMixin | null {
+        const returnType = this.parseType();
+        const path = this.parseQualifiedName();
+        if (path.length < 2) {
+            this.s.error(`expected qualified method name in mixin`, this.s.peek()?.location ?? kw.location);
+            this.s.panicRecover();
+            return null;
+        }
+        const ownerTokens = path.slice(0, -1);
+        const methodNameTok = path[path.length - 1];
+        const ownerName = ownerTokens[ownerTokens.length - 1];
+        this.s.expectPunct('(', `expected '(' in mixin method`);
+        const params = this.parseParamList();
+        this.s.expectPunct(')', `expected ')' in mixin method params`);
+        const body = this.parseBlock();
+        const ownerType: NodeType = {
+            kind: NodeKind.Type,
+            range: { start: ownerTokens[0].location.start, end: ownerTokens[ownerTokens.length - 1].location.end },
+            path: ownerTokens,
+            generics: [],
+            pointerLevel: 0,
+            isReference: false,
+            isConst: false,
+            isNullable: false,
+        };
+        const method: NodeMethod = {
+            kind: NodeKind.Method,
+            range: { start: returnType.range.start, end: body.range.end },
+            returnType,
+            name: methodNameTok as TokenIdentifier,
+            params,
+            body,
+            annotations: [],
+            modifiers: [],
+            templateParams: [],
+        };
+        return {
+            kind: NodeKind.Mixin,
+            range: this.s.rangeFromTokens(kw),
+            name: ownerName as TokenIdentifier,
+            bases: [ownerType],
+            members: [method],
         };
     }
 
@@ -526,6 +621,8 @@ class Parser {
         const kw = this.s.advance()!;
         const name = this.s.expectIdentifier(`expected ${kind} name`);
         if (!name) { this.s.panicRecover(); return null; }
+        // Optional `final` after class/struct name (vestigial — Enma has no sealed classes).
+        this.s.matchReserved('final');
         const bases = this.s.matchOp(':') ? this.parseBaseList() : [];
         this.s.expectPunct('{', `expected '{' after ${kind} name`);
         const prevClass = this.currentClassName;
@@ -724,6 +821,13 @@ class Parser {
         this.s.expectPunct('(', `expected '(' after function name`);
         const params = this.parseParamList();
         this.s.expectPunct(')', `expected ')' after function params`);
+        // Trailing modifiers (parser is permissive — analyzer enforces semantic legality).
+        modifiers.push(...this.parseModifiers());
+        // Trailing return type: `auto fn(...) -> T { ... }` overrides the
+        // leading return type (which is typically `auto`).
+        if (this.s.matchOp('->')) {
+            returnType = this.parseType();
+        }
         let body: NodeStmtBlock | null = null;
         if (this.s.matchPunct(';')) {
             body = null;
@@ -760,6 +864,17 @@ class Parser {
     private parseMemberList(className: string): NodeMember[] {
         const result: NodeMember[] = [];
         while (!this.s.isEOF && !this.s.check(TokenKind.Punctuation, '}')) {
+            // Access labels (`public:` / `private:`) are accepted-and-ignored
+            // — Enma doesn't enforce visibility at the script level.
+            const t = this.s.peek();
+            if (t && t.kind === TokenKind.Reserved
+                && (t.text === 'public' || t.text === 'private')
+                && this.s.peek(1)?.kind === TokenKind.Operator
+                && this.s.peek(1)?.text === ':') {
+                this.s.advance(); // label keyword
+                this.s.advance(); // ':'
+                continue;
+            }
             const before = this.s.pos;
             try {
                 const m = this.parseMember(className);
@@ -839,6 +954,21 @@ class Parser {
         this.s.expectPunct('(', `expected '(' in constructor`);
         const params = this.parseParamList();
         this.s.expectPunct(')', `expected ')' in constructor`);
+        const initList: Array<{
+            base: ReadonlyArray<TokenIdentifier | TokenReserved>;
+            args: ReadonlyArray<NodeExpr>;
+        }> = [];
+        if (this.s.check(TokenKind.Operator, ':')) {
+            this.s.advance();
+            do {
+                const base = this.parseQualifiedName();
+                this.s.expectPunct('(', `expected '(' in ctor init`);
+                const args: NodeExpr[] = [];
+                if (!this.s.check(TokenKind.Punctuation, ')')) this.parseExprListInto(args);
+                this.s.expectPunct(')', `expected ')' in ctor init`);
+                initList.push({ base, args });
+            } while (this.s.matchOp(','));
+        }
         // Allow declaration-only form (predefined files): `Name(...);`
         let body: NodeStmtBlock | null;
         if (this.s.matchPunct(';')) {
@@ -853,6 +983,7 @@ class Parser {
             params,
             body,
             annotations,
+            initList,
         };
     }
 
@@ -907,10 +1038,10 @@ class Parser {
         // We cannot easily tell field-vs-method-vs-overload until after Type+Name; do it.
         // But operator overload uses `Type 'operator' OpToken (...)` — handled below since 'operator'
         // appears AFTER Type; we re-check after parseType.
-        const type = this.parseType();
+        let type = this.parseType();
 
         if (this.s.check(TokenKind.Reserved, 'operator')) {
-            return this.parseOperatorOverloadAfterType(startTok, type, annotations);
+            return this.parseOperatorOverloadAfterType(startTok, type, annotations, modifiers);
         }
 
         const name = this.s.peek();
@@ -930,6 +1061,12 @@ class Parser {
             this.s.expectPunct('(');
             const params = this.parseParamList();
             this.s.expectPunct(')', `expected ')' after method params`);
+            // Trailing modifiers (e.g. `void f() override`, `int g() const final`).
+            modifiers.push(...this.parseModifiers());
+            // Trailing return type: `auto m(...) -> T { ... }` (replaces leading type).
+            if (this.s.matchOp('->')) {
+                type = this.parseType();
+            }
             let body: NodeStmtBlock | null = null;
             if (this.s.matchPunct(';')) {
                 body = null;
@@ -953,6 +1090,13 @@ class Parser {
         // field
         let initializer: NodeExpr | null = null;
         if (this.s.matchOp('=')) initializer = this.parseExpr();
+        // Bitfield width: `uint32 ready : 1;` — `:` is tokenized as Operator.
+        let bitWidth: NodeExpr | null = null;
+        const colon = this.s.peek();
+        if (colon && colon.kind === TokenKind.Operator && colon.text === ':') {
+            this.s.advance();
+            bitWidth = this.parseExpr();
+        }
         this.s.expectPunct(';', `expected ';' after field`);
         const field: NodeField = {
             kind: NodeKind.Field,
@@ -962,6 +1106,7 @@ class Parser {
             initializer,
             annotations,
             modifiers,
+            bitWidth,
         };
         return field;
     }
@@ -971,19 +1116,37 @@ class Parser {
         modifiers: TokenReserved[],
         annotations: NodeAnnotation[],
     ): NodeOperatorOverload | null {
-        // `operator OPTOK (...)` — return type missing? Some langs allow; we still need it for shape.
-        // Fall through to assume `void` — but we should never reach here under the BNF. Error.
-        this.s.error(`unexpected 'operator' before return type`, this.s.peek()!.location);
-        return this.parseOperatorOverloadAfterType(startTok, this.makeImplicitVoidType(this.s.peek()!.location.start), annotations, modifiers);
+        // Conversion operator form: `operator T() { body }`. The conversion target
+        // type follows `operator`, with no preceding return type.
+        const opKw = this.s.advance()!; // 'operator'
+        const targetType = this.parseType();
+        this.s.expectPunct('(', `expected '(' in conversion operator`);
+        const params = this.parseParamList();
+        this.s.expectPunct(')', `expected ')' in conversion operator`);
+        const body = this.parseBlock();
+        const castMarker: TokenReserved = {
+            kind: TokenKind.Reserved,
+            text: 'cast',
+            location: opKw.location,
+        };
+        return {
+            kind: NodeKind.OperatorOverload,
+            range: this.s.rangeFromTokens(startTok),
+            returnType: targetType,
+            op: castMarker,
+            params,
+            body,
+            annotations,
+            modifiers,
+        };
     }
 
     private parseOperatorOverloadAfterType(
         startTok: TokenObject,
         returnType: NodeType,
         annotations: NodeAnnotation[],
-        _modifiers: TokenReserved[] = [],
+        modifiers: TokenReserved[] = [],
     ): NodeOperatorOverload | null {
-        void annotations; void _modifiers;
         this.s.expectReserved('operator', `expected 'operator'`);
         const opTok = this.s.peek();
         if (!opTok) {
@@ -998,6 +1161,12 @@ class Parser {
             if (close?.text === ']') {
                 this.s.advance();
                 opCombined = { ...opTok, text: '[]' } as TokenObject;
+                // `operator[]=` write-subscript variant.
+                const eq = this.s.peek();
+                if (eq && eq.kind === TokenKind.Operator && eq.text === '=') {
+                    this.s.advance();
+                    opCombined = { ...opTok, text: '[]=' } as TokenObject;
+                }
             }
         } else if (opTok.kind === TokenKind.Punctuation && opTok.text === '(') {
             const close = this.s.peek();
@@ -1017,6 +1186,8 @@ class Parser {
             op: opCombined,
             params,
             body,
+            annotations,
+            modifiers,
         };
     }
 
@@ -1146,8 +1317,35 @@ class Parser {
     // ---- Types ----
 
     // BNF: Type ::= [ 'const' ] [ 'nullable' ] QualifiedName [ '<' TypeArgList '>' ] { '*' } [ '&' ]
+    //            |  'decltype' '(' Expr ')'
     parseType(): NodeType {
         const startTok = this.s.peek();
+        if (startTok && startTok.kind === TokenKind.Reserved && startTok.text === 'decltype') {
+            this.s.advance();
+            this.s.expectPunct('(', `expected '(' after 'decltype'`);
+            const expr = this.parseExpr();
+            this.s.expectPunct(')', `expected ')' after decltype expression`);
+            const declMarker: TokenReserved = {
+                kind: TokenKind.Reserved,
+                text: 'decltype',
+                location: startTok.location,
+            };
+            const range: TextRange = {
+                start: startTok.location.start,
+                end: this.s.prev()?.location.end ?? startTok.location.end,
+            };
+            return {
+                kind: NodeKind.Type,
+                range,
+                path: [declMarker],
+                generics: [],
+                pointerLevel: 0,
+                isReference: false,
+                isConst: false,
+                isNullable: false,
+                decltypeExpr: expr,
+            };
+        }
         let isConst = false;
         let isNullable = false;
         while (true) {
@@ -1172,8 +1370,14 @@ class Parser {
         let pointerLevel = 0;
         while (this.s.check(TokenKind.Operator, '*')) { this.s.advance(); pointerLevel++; }
         let isReference = false;
-        if (this.s.check(TokenKind.Operator, '&')) {
+        // `&` and `&&` (rvalue ref) both collapse to isReference — rvalue refs
+        // are accepted only in move-ctor params per spec, but the type-system
+        // representation is identical.
+        if (this.s.check(TokenKind.Operator, '&&')) {
             this.s.advance(); isReference = true;
+        } else if (this.s.check(TokenKind.Operator, '&')) {
+            this.s.advance(); isReference = true;
+            if (this.s.check(TokenKind.Operator, '&')) this.s.advance();
         }
         // Typed-array suffix `T[]` — desugar to `array<T>`. Only matched as an
         // empty bracket pair (immediate `]`) to avoid colliding with subscript
@@ -1347,6 +1551,13 @@ class Parser {
     private parseStmtIf(): NodeStmtIf | null {
         const kw = this.s.advance()!;
         this.s.expectPunct('(', `expected '(' after 'if'`);
+        let init: NodeStmtVar | NodeStmtExpr | null = null;
+        if (this.hasIfInitClause()) {
+            const initStmt = this.parseVarOrExprStmt();
+            if (initStmt && (initStmt.kind === NodeKind.StmtVar || initStmt.kind === NodeKind.StmtExpr)) {
+                init = initStmt;
+            }
+        }
         const condition = this.parseExpr();
         this.s.expectPunct(')', `expected ')' after if-condition`);
         const thenBranch = this.parseStmt() ?? this.makeEmptyStmt(kw);
@@ -1360,7 +1571,29 @@ class Parser {
             condition,
             thenBranch,
             elseBranch,
+            init,
         };
+    }
+
+    /** True iff the upcoming `if (...)` head contains a `;` at depth 0 before its closing `)`. */
+    private hasIfInitClause(): boolean {
+        let depth = 0;
+        for (let i = 0; i < 256; i++) {
+            const t = this.s.peek(i);
+            if (!t) return false;
+            if (t.kind === TokenKind.Punctuation) {
+                if (t.text === '(') depth++;
+                else if (t.text === ')') {
+                    if (depth === 0) return false;
+                    depth--;
+                } else if (t.text === ';' && depth === 0) {
+                    return true;
+                } else if (t.text === '{' && depth === 0) {
+                    return false;
+                }
+            }
+        }
+        return false;
     }
 
     private parseStmtFor(): NodeStmtFor | NodeStmtForeach | null {
@@ -1592,7 +1825,26 @@ class Parser {
     }
     private parseStmtDefer(): NodeStmtDefer {
         const kw = this.s.advance()!;
-        const body = this.parseBlock();
+        // Two forms: block `defer { ... }` and Go-style `defer Expr;`.
+        // Wrap the expression form in a synthetic block so downstream consumers
+        // can keep treating `body` as a NodeStmtBlock uniformly.
+        if (this.s.check(TokenKind.Punctuation, '{')) {
+            const body = this.parseBlock();
+            return { kind: NodeKind.StmtDefer, range: this.s.rangeFromTokens(kw), body };
+        }
+        const exprStartTok = this.s.peek() ?? kw;
+        const expr = this.parseExpr();
+        this.s.expectPunct(';', `expected ';' after defer expression`);
+        const exprStmt: NodeStmtExpr = {
+            kind: NodeKind.StmtExpr,
+            range: { start: exprStartTok.location.start, end: this.s.prev()?.location.end ?? exprStartTok.location.end },
+            expr,
+        };
+        const body: NodeStmtBlock = {
+            kind: NodeKind.StmtBlock,
+            range: exprStmt.range,
+            stmts: [exprStmt],
+        };
         return { kind: NodeKind.StmtDefer, range: this.s.rangeFromTokens(kw), body };
     }
     private parseStmtYield(): NodeStmtYield {
@@ -1665,6 +1917,37 @@ class Parser {
         // Need name token (ID or primitive)
         const head = this.s.peek(i);
         if (!head) return false;
+        // `decltype(expr)` as a type-starter: skip past the matched parens.
+        if (head.kind === TokenKind.Reserved && head.text === 'decltype') {
+            const open = this.s.peek(i + 1);
+            if (!open || open.kind !== TokenKind.Punctuation || open.text !== '(') return false;
+            let depth = 1;
+            i += 2;
+            while (depth > 0) {
+                const t = this.s.peek(i);
+                if (!t) return false;
+                if (t.kind === TokenKind.Punctuation && t.text === '(') depth++;
+                else if (t.kind === TokenKind.Punctuation && t.text === ')') depth--;
+                i++;
+            }
+            while (true) {
+                const t = this.s.peek(i);
+                if (!t) return false;
+                if (t.kind === TokenKind.Operator && (t.text === '*' || t.text === '&')) { i++; continue; }
+                break;
+            }
+            const nameTok2 = this.s.peek(i);
+            if (!nameTok2) return false;
+            const isNameTok2 = nameTok2.kind === TokenKind.Identifier
+                || (nameTok2.kind === TokenKind.Reserved && CONTEXTUAL_AS_IDENT.has(nameTok2.text));
+            if (!isNameTok2) return false;
+            i++;
+            const after2 = this.s.peek(i);
+            if (!after2) return false;
+            if (after2.kind === TokenKind.Operator && after2.text === '=') return true;
+            if (after2.kind === TokenKind.Punctuation && after2.text === ';') return true;
+            return false;
+        }
         const headIsType = head.kind === TokenKind.Reserved && (isPrimitive(head.text) || head.text === 'void' || head.text === 'auto');
         const headIsIdent = head.kind === TokenKind.Identifier;
         if (!headIsType && !headIsIdent) return false;
@@ -2172,9 +2455,64 @@ class Parser {
                 if (ok) { expr = ok; continue; }
                 this.s.restore(m);
             }
+            // Uniform init `T{...}` — only when the head expr is a name path.
+            if (t.kind === TokenKind.Punctuation && t.text === '{' && this.isTypeNameExpr(expr)) {
+                const inner = this.parseBraceInit();
+                if (inner.kind === NodeKind.ExprDesignatedInit) {
+                    expr = {
+                        kind: NodeKind.ExprDesignatedInit,
+                        range: { start: expr.range.start, end: inner.range.end },
+                        typeName: this.exprToType(expr),
+                        fields: inner.fields,
+                    } as NodeExprDesignatedInit;
+                } else {
+                    expr = {
+                        kind: NodeKind.ExprCall,
+                        range: { start: expr.range.start, end: inner.range.end },
+                        callee: expr,
+                        templateArgs: [],
+                        args: (inner as NodeExprArrayInit).elements,
+                    } as NodeExprCall;
+                }
+                continue;
+            }
             break;
         }
         return expr;
+    }
+
+    /** Identifier / namespace-access / member-dot — i.e. a name-path expression suitable as a type prefix. */
+    private isTypeNameExpr(e: NodeExpr): boolean {
+        return e.kind === NodeKind.ExprIdentifier
+            || e.kind === NodeKind.ExprNamespaceAccess
+            || e.kind === NodeKind.ExprMemberDot;
+    }
+
+    /** Convert a name-path expression (Identifier / NamespaceAccess / MemberDot) into a NodeType. */
+    private exprToType(e: NodeExpr): NodeType {
+        const path: Array<TokenIdentifier | TokenReserved> = [];
+        const collect = (n: NodeExpr): void => {
+            if (n.kind === NodeKind.ExprIdentifier) {
+                path.push(n.token);
+            } else if (n.kind === NodeKind.ExprNamespaceAccess) {
+                collect(n.scope);
+                path.push(n.member);
+            } else if (n.kind === NodeKind.ExprMemberDot) {
+                collect(n.object);
+                path.push(n.member);
+            }
+        };
+        collect(e);
+        return {
+            kind: NodeKind.Type,
+            range: e.range,
+            path,
+            generics: [],
+            pointerLevel: 0,
+            isReference: false,
+            isConst: false,
+            isNullable: false,
+        };
     }
 
     /** Heuristic: peek ahead from `<` to see whether a matching `>(`  pattern exists.

@@ -59,6 +59,25 @@ describe('Parser — class / struct / interface (§A3 multi-inheritance)', () =>
         assert.ok(m.modifiers.some((mod: any) => mod.text === 'override'));
     });
 
+    it('parses trailing modifiers on methods (override / final / const)', () => {
+        const r = parseSource(`
+            class CountingSink : CaptureSink {
+                int64 bytes;
+                void accept(string row) override { bytes += row.length(); }
+                int32 size() const final { return bytes; }
+                bool ready() override;
+            }
+        `);
+        assert.strictEqual(parserErrors(r.diagnostics).length, 0);
+        const cls = r.ast.children[0] as any;
+        const methods = cls.members.filter((mm: any) => mm.kind === NodeKind.Method);
+        assert.strictEqual(methods.length, 3);
+        assert.ok(methods[0].modifiers.some((m: any) => m.text === 'override'));
+        assert.ok(methods[1].modifiers.some((m: any) => m.text === 'const'));
+        assert.ok(methods[1].modifiers.some((m: any) => m.text === 'final'));
+        assert.ok(methods[2].modifiers.some((m: any) => m.text === 'override'));
+    });
+
     it('parses virtual / final / friend modifiers on methods', () => {
         const r = parseSource(`
             class V {
