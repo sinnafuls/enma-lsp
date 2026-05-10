@@ -27,88 +27,88 @@ void print_console(string msg);
 
 class proc_t {
     // Identity
-    int64 base_address();
-    int64 peb();
+    uint64 base_address();
+    uint64 peb();
     uint32 pid();
     bool alive();
-    bool is_valid_address(int64 addr);
+    bool is_valid_address(uint64 addr);
 
     // Read primitives
-    uint8 ru8(int64 addr);
-    uint16 ru16(int64 addr);
-    uint32 ru32(int64 addr);
-    uint64 ru64(int64 addr);
-    int8 r8(int64 addr);
-    int16 r16(int64 addr);
-    int32 r32(int64 addr);
-    int64 r64(int64 addr);
-    float32 rf32(int64 addr);
-    float64 rf64(int64 addr);
-    string rs(int64 addr, int32 max_chars);
-    string rws(int64 addr, int32 max_chars);
+    uint8 ru8(uint64 addr);
+    uint16 ru16(uint64 addr);
+    uint32 ru32(uint64 addr);
+    uint64 ru64(uint64 addr);
+    int8 r8(uint64 addr);
+    int16 r16(uint64 addr);
+    int32 r32(uint64 addr);
+    int64 r64(uint64 addr);
+    float32 rf32(uint64 addr);
+    float64 rf64(uint64 addr);
+    string rs(uint64 addr, int32 max_chars);
+    string rws(uint64 addr, int32 max_chars);
 
     // Write primitives (gated: write_memory)
-    bool wu8(int64 addr, uint8 v);
-    bool wu16(int64 addr, uint16 v);
-    bool wu32(int64 addr, uint32 v);
-    bool wu64(int64 addr, uint64 v);
-    bool w8(int64 addr, int8 v);
-    bool w16(int64 addr, int16 v);
-    bool w32(int64 addr, int32 v);
-    bool w64(int64 addr, int64 v);
-    bool wf32(int64 addr, float32 v);
-    bool wf64(int64 addr, float64 v);
-    bool ws(int64 addr, string text);
-    bool wws(int64 addr, string text);
+    bool wu8(uint64 addr, uint8 v);
+    bool wu16(uint64 addr, uint16 v);
+    bool wu32(uint64 addr, uint32 v);
+    bool wu64(uint64 addr, uint64 v);
+    bool w8(uint64 addr, int8 v);
+    bool w16(uint64 addr, int16 v);
+    bool w32(uint64 addr, int32 v);
+    bool w64(uint64 addr, int64 v);
+    bool wf32(uint64 addr, float32 v);
+    bool wf64(uint64 addr, float64 v);
+    bool ws(uint64 addr, string text);
+    bool wws(uint64 addr, string text);
 
     // Bulk read/write
-    array<uint8> rvm(int64 addr, int64 size);
-    bool wvm(int64 addr, array<uint8> bytes);
+    array<uint8> rvm(uint64 addr, int64 size);
+    bool wvm(uint64 addr, array<uint8> bytes);
 
     // SIMD-width reads/writes
-    array<uint8> r128(int64 addr);
-    array<uint8> r256(int64 addr);
-    array<uint8> r512(int64 addr);
-    bool w128(int64 addr, array<uint8> bytes);
-    bool w256(int64 addr, array<uint8> bytes);
-    bool w512(int64 addr, array<uint8> bytes);
+    array<uint8> r128(uint64 addr);
+    array<uint8> r256(uint64 addr);
+    array<uint8> r512(uint64 addr);
+    bool w128(uint64 addr, array<uint8> bytes);
+    bool w256(uint64 addr, array<uint8> bytes);
+    bool w512(uint64 addr, array<uint8> bytes);
 
     // Modules and exports
-    int64 get_module_base(string name);
+    uint64 get_module_base(string name);
     int64 get_module_size(string name);
-    int64 get_proc_address(int64 module_base, string export_name);
-    int64 get_import_rdata_address(int64 module_base, string import_name);
+    uint64 get_proc_address(uint64 module_base, string export_name);
+    uint64 get_import_rdata_address(uint64 module_base, string import_name);
 
     // Pattern scanning
-    int64 find_code_pattern(int64 search_start, int64 search_size, string sig);
-    array<int64> find_all_code_patterns(int64 search_start, int64 search_size, string sig);
+    uint64 find_code_pattern(uint64 search_start, int64 search_size, string sig);
+    array<uint64> find_all_code_patterns(uint64 search_start, int64 search_size, string sig);
 
     // Threads
-    array<int64> get_all_tebs();
+    array<uint64> get_all_tebs();
 
     // Pointer arrays
-    array<int64> read_pointer_array(int64 base, int64 count, int64 offset_delta);
+    array<uint64> read_pointer_array(uint64 base, int64 count, int64 offset_delta);
 
     // VAD / virtual_query
-    vad_region_t virtual_query(int64 address);
+    vad_region_t virtual_query(uint64 address);
     array<vad_region_t> get_vad_snapshot(bool heap_likely_only);
 
     // Memory scans
-    array<int64> scan_string(string text, bool heap_only);
-    array<int64> scan_wstring(string text, bool heap_only);
-    array<int64> scan_pointer(int64 target, bool heap_only);
-    array<int64> scan_u64(int64 value, bool heap_only);
-    array<int64> scan_u32(uint32 value, bool heap_only);
-    array<int64> scan_float(float32 value, bool heap_only);
-    array<int64> scan_double(float64 value, bool heap_only);
+    array<uint64> scan_string(string text, bool heap_only);
+    array<uint64> scan_wstring(string text, bool heap_only);
+    array<uint64> scan_pointer(uint64 target, bool heap_only);
+    array<uint64> scan_u64(uint64 value, bool heap_only);
+    array<uint64> scan_u32(uint32 value, bool heap_only);
+    array<uint64> scan_float(float32 value, bool heap_only);
+    array<uint64> scan_double(float64 value, bool heap_only);
 
     // VM alloc / free (gated: virtual_memory_operations)
-    int64 alloc_vm(int64 size);
-    bool free_vm(int64 address);
+    uint64 alloc_vm(int64 size);
+    bool free_vm(uint64 address);
 }
 
 class vad_region_t {
-    int64 start();
+    uint64 start();
     int64 size();
     int64 protection();
     bool heap_likely();
@@ -135,10 +135,11 @@ string month_name(int64 month);
 int64 hour12(int64 hour24);
 string ampm(int64 hour24);
 
-uint32 bits_f32_to_u32(float32 v);
-float32 bits_u32_to_f32(uint32 v);
-uint64 bits_f64_to_u64(float64 v);
-float64 bits_u64_to_f64(uint64 v);
+// Bit-pattern conversions are now done with reinterpret_cast<T>(val):
+//   uint32 bits = reinterpret_cast<uint32>(1.5f);
+//   float32 f   = reinterpret_cast<float32>(0x3FC00000u);
+// The old bits_f32_to_u32 / bits_u32_to_f32 / bits_f64_to_u64 /
+// bits_u64_to_f64 natives have been removed.
 
 bool set_thread_priority(int64 p);
 

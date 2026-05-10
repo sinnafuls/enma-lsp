@@ -126,19 +126,19 @@ void test_cpu() {
     T("ampm(12)=PM", ampm(12) == "PM", "");
     T("ampm(23)=PM", ampm(23) == "PM", "");
 
-    // Bitcasts: float<->u32 round-trip on a known value.
+    // Bitcasts: float<->u32 round-trip on a known value (reinterpret_cast<>).
     float32 fpi = cast<float32>(3.14159f);
-    uint32 fbits = bits_f32_to_u32(fpi);
-    float32 fback = bits_u32_to_f32(fbits);
+    uint32 fbits = reinterpret_cast<uint32>(fpi);
+    float32 fback = reinterpret_cast<float32>(fbits);
     T("f32 bitcast roundtrip", fback == fpi, "");
 
     float64 dpi = 3.14159265358979;
-    uint64 dbits = bits_f64_to_u64(dpi);
-    float64 dback = bits_u64_to_f64(dbits);
+    uint64 dbits = reinterpret_cast<uint64>(dpi);
+    float64 dback = reinterpret_cast<float64>(dbits);
     T("f64 bitcast roundtrip", dback == dpi, "");
 
-    T("bits_f32_to_u32(0.0)=0", bits_f32_to_u32(0.0f) == 0, "");
-    T("bits_f64_to_u64(0.0)=0", bits_f64_to_u64(0.0) == 0, "");
+    T("reinterpret_cast<uint32>(0.0f)=0", reinterpret_cast<uint32>(0.0f) == 0, "");
+    T("reinterpret_cast<uint64>(0.0)=0",  reinterpret_cast<uint64>(0.0)  == 0, "");
 
     // Thread priority — flip down then up, restore to normal.
     bool ok_lo = set_thread_priority(thread_priority::lowest);

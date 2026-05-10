@@ -5,7 +5,7 @@
 //   - cpu_vendor / cpu_brand
 //   - rdtsc / perf_time / perf_frequency / get_tickcount64
 //   - now_millisecond / day_name / month_name / hour12 / ampm
-//   - bits_f32_to_u32 / bits_u32_to_f32 / bits_f64_to_u64 / bits_u64_to_f64
+//   - reinterpret_cast<uint32/float32/uint64/float64> for bit-pattern conversions
 //   - set_thread_priority(thread_priority)
 //
 // Single-shot routine launched from main(); main returns 1 to keep the script
@@ -122,44 +122,44 @@ void test_routine(int64 data) {
     // -----------------------------------------------------------------------
     // Bitcasts — round-trip + known IEEE-754 values
     // -----------------------------------------------------------------------
-    section("bitcasts (float<->int)");
+    section("bitcasts (float<->int) via reinterpret_cast<>");
 
     // 1.0f IEEE-754 = 0x3F800000
-    uint32 one_f32_bits = bits_f32_to_u32(1.0f);
-    check("bits_f32_to_u32(1.0f) == 0x3F800000", one_f32_bits == 0x3F800000);
+    uint32 one_f32_bits = reinterpret_cast<uint32>(1.0f);
+    check("reinterpret_cast<uint32>(1.0f) == 0x3F800000", one_f32_bits == 0x3F800000);
 
-    float32 round_f32 = bits_u32_to_f32(0x3F800000);
-    check("bits_u32_to_f32(0x3F800000) == 1.0f", round_f32 == 1.0f);
+    float32 round_f32 = reinterpret_cast<float32>(0x3F800000);
+    check("reinterpret_cast<float32>(0x3F800000) == 1.0f", round_f32 == 1.0f);
 
     // -0.0f = 0x80000000. We round-trip via the API itself rather than
     // writing -0.0f as a literal: enma's parser folds `-0.0f` to plain 0.0f,
     // so the literal path tests the parser, not the bitcast. This path is
-    // a clean test of the API: int -> float -> int round-trip preserves the
+    // a clean test of the cast: int -> float -> int round-trip preserves the
     // sign bit.
-    float32 neg_zero    = bits_u32_to_f32(0x80000000);
-    uint32  neg_zero_bits = bits_f32_to_u32(neg_zero);
+    float32 neg_zero      = reinterpret_cast<float32>(0x80000000);
+    uint32  neg_zero_bits = reinterpret_cast<uint32>(neg_zero);
     check("0x80000000 -> f32 -> u32 round-trips (-0.0f sign bit preserved)",
           neg_zero_bits == 0x80000000);
 
     // 1.0 (double) IEEE-754 = 0x3FF0000000000000
-    uint64 one_f64_bits = bits_f64_to_u64(1.0);
-    check("bits_f64_to_u64(1.0) == 0x3FF0000000000000", one_f64_bits == 0x3FF0000000000000);
+    uint64 one_f64_bits = reinterpret_cast<uint64>(1.0);
+    check("reinterpret_cast<uint64>(1.0) == 0x3FF0000000000000", one_f64_bits == 0x3FF0000000000000);
 
-    float64 round_f64 = bits_u64_to_f64(0x3FF0000000000000);
-    check("bits_u64_to_f64(0x3FF0000000000000) == 1.0", round_f64 == 1.0);
+    float64 round_f64 = reinterpret_cast<float64>(0x3FF0000000000000);
+    check("reinterpret_cast<float64>(0x3FF0000000000000) == 1.0", round_f64 == 1.0);
 
     // Round-trip through f32 → u32 → f32 preserves the bit pattern of a
     // representable value. 3.14159 is not exactly representable, but the
     // round-trip is exact at the bit level.
-    float32 pi32 = 3.14159f;
-    uint32  pi32_bits = bits_f32_to_u32(pi32);
-    float32 pi32_back = bits_u32_to_f32(pi32_bits);
-    check("f32 round-trip preserves bits", bits_f32_to_u32(pi32_back) == pi32_bits);
+    float32 pi32      = 3.14159f;
+    uint32  pi32_bits = reinterpret_cast<uint32>(pi32);
+    float32 pi32_back = reinterpret_cast<float32>(pi32_bits);
+    check("f32 round-trip preserves bits", reinterpret_cast<uint32>(pi32_back) == pi32_bits);
 
-    float64 e64 = 2.718281828459045;
-    uint64  e64_bits = bits_f64_to_u64(e64);
-    float64 e64_back = bits_u64_to_f64(e64_bits);
-    check("f64 round-trip preserves bits", bits_f64_to_u64(e64_back) == e64_bits);
+    float64 e64      = 2.718281828459045;
+    uint64  e64_bits = reinterpret_cast<uint64>(e64);
+    float64 e64_back = reinterpret_cast<float64>(e64_bits);
+    check("f64 round-trip preserves bits", reinterpret_cast<uint64>(e64_back) == e64_bits);
 
     // -----------------------------------------------------------------------
     // Thread priority — exercise every enum value; assert SetThreadPriority

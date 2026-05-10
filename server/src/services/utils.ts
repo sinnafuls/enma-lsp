@@ -295,9 +295,9 @@ export const KEYWORD_HOVERS: Readonly<Record<string, string>> = {
     offsetof:      '`offsetof(T, field)` — byte offset of a struct field.',
     static_assert: 'Compile-time check.',
     cast:          "`cast<T>(expr)` — Enma's general cast.",
-    static_cast:   'Compile-time-checked numeric/class cast.',
-    reinterpret_cast: 'Bit-pattern cast.',
-    const_cast:    'Strip `const`.',
+    static_cast:   '`static_cast<T>(expr)` — well-defined value conversion (currently aliased to `cast<>`).',
+    reinterpret_cast: '`reinterpret_cast<T>(expr)` — bit-pattern preserving cast between same-byte-size types. Replaces the removed `bits_f32_to_u32` / `bits_u64_to_f64` natives.',
+    const_cast:    '`const_cast<T>(expr)` — strip `const`, keep bits.',
 };
 
 // ---- Operator overload name → glyph (for inlay hints) ------------------
