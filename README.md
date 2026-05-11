@@ -17,7 +17,8 @@ Full LSP support for [Enma](https://enma-1.gitbook.io/enma) — the JIT-compiled
 - **Cross-file indexing** — LRU index cache (§A8, default 300 closed files); preprocessor `#include` / `#define` support; workspace `.em.predefined` files
 - **Predefined file support** — bundled stdlib + workspace `.em.predefined` with §A10 precedence
 - **Permissions banner** — warns when FFI (`[[dll]]`) or file-system intrinsics are used without explicit opt-in
-- **Snippets** — ~20 language patterns + stdlib snippets
+- **Snippets** — ~20 language patterns + 50 stdlib snippets (math, vec, `list`/`imap`, `mat4`/`quat`, time, file, regex, json, mutex, atomic, coroutine, annotations)
+- **Stdlib coverage** — 900 entries from the upstream Enma reference: 21 types (`array`, `map`, `list`, `imap`, `hash_set`, `sorted_map`, `vec2/3/4`, `mat4`, `quat`, `variant`, `string`, `regex`, `json_value`, `file_t`, `mutex`, `cond_var`, `atomic_int32/64`, `coroutine_t`, `lock_guard`), 534 free functions, plus all factories and methods
 - **Bracket matching, auto-closing pairs, comment toggling, folding markers**
 - **`.emb` binary marker** — VSCode doesn't try to render binary format as text
 
@@ -169,7 +170,7 @@ args = ["enma-lsp", "--stdio"]
 ```
 npm install
 npm run compile   # tsc + esbuild bundles both client and server
-npm test          # runs 792 server-side unit tests (mocha)
+npm test          # runs 936 server-side unit tests (mocha)
 ```
 
 - Press `F5` in VSCode to launch an Extension Development Host.

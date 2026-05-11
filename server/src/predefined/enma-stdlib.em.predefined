@@ -1,6 +1,6 @@
 // Auto-generated from data/enma-stdlib.json — do not edit by hand.
 // Regenerate via: npm run regenerate-stdlib
-// Total entries: 819
+// Total entries: 900
 
 // ---- Type declarations -------------------------------------------------------
 
@@ -34,6 +34,7 @@ class variant {
     void set_bool(bool p0);
     void set_str(string p0);
     void set_null();
+    variant convert(int64 type_id);
 }
 
 class atomic_int64 {
@@ -190,6 +191,9 @@ class mutex {
     void lock();
     void unlock();
     bool try_lock();
+    variant lock_shared();
+    variant unlock_shared();
+    variant try_lock_shared();
 }
 
 class lock_guard {
@@ -284,6 +288,66 @@ class vec4 {
     vec4 scale(float64 p0);
     vec4 negate();
     vec4 lerp(vec4 p0, float64 p1);
+}
+
+class list {
+    variant push_back(T x);
+    variant push(T x);
+    variant push_front(T x);
+    variant pop_back();
+    variant pop();
+    variant pop_front();
+    variant insert(int64 idx, T x);
+    variant remove(int64 idx);
+    variant at(int64 idx);
+    variant first();
+    variant last();
+    variant contains(T x);
+    variant has(T x);
+    variant index_of(T x);
+    variant size();
+    variant length();
+    variant empty();
+    variant clear();
+    variant reverse();
+    variant to_array();
+    variant copy();
+    variant extend(list<T> other);
+}
+
+class imap {
+    variant contains(int64 k);
+    variant has_value(V v);
+    variant size();
+    variant remove(int64 k);
+    variant clear();
+    variant keys();
+    variant values();
+}
+
+class quat {
+    variant normalize();
+    variant conjugate();
+    variant inverse();
+    variant mul(quat other);
+    variant add(quat other);
+    variant negate();
+    variant rotate(vec3 v);
+    variant to_euler();
+    variant slerp(quat other, float64 t);
+    variant length();
+    variant length_sq();
+    variant dot(quat other);
+}
+
+class mat4 {
+    variant transpose();
+    variant inverse();
+    variant determinant();
+    variant mul(mat4 other);
+    variant transform_point(vec3 p);
+    variant transform_vec3(vec3 v);
+    variant transform_vec4(vec4 v);
 }
 
 // ---- Global functions -------------------------------------------------------
@@ -806,3 +870,19 @@ float64 move_toward(float64 arg0, float64 arg1, float64 arg2);
 float64 ease_in(float64 arg0);
 float64 ease_out(float64 arg0);
 float64 ease_in_out(float64 arg0);
+variant quat_identity();
+variant quat_from_euler(float64 yaw, float64 pitch, float64 roll);
+variant quat_from_axis_angle(vec3 axis, float64 rad);
+variant mat4_identity();
+variant mat4_translation(vec3 t);
+variant mat4_scale(vec3 s);
+variant mat4_rotation_x(float64 rad);
+variant mat4_rotation_y(float64 rad);
+variant mat4_rotation_z(float64 rad);
+variant mat4_rotation_axis(vec3 axis, float64 rad);
+variant mat4_from_quat(quat q);
+variant mat4_perspective(float64 fov_rad, float64 aspect, float64 near_z, float64 far_z);
+variant mat4_orthographic(float64 left, float64 right, float64 bottom, float64 top, float64 near_z, float64 far_z);
+variant mat4_look_at(vec3 eye, vec3 target, vec3 up);
+variant url_encode(string s);
+variant url_decode(string s);

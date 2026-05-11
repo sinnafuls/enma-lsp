@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.1.9 — Upstream stdlib sync (list / imap / mat4 / quat)
+
+Tracks the latest upstream `enma-stdlib.json` from the language owner's reference extension. The bundled stdlib grows from 819 → 900 entries (+9.9%); all completion, hover, signature help, and type-checker paths pick up the new symbols automatically via the auto-regenerated `enma-stdlib.em.predefined`.
+
+### What's new
+
+- **New stdlib types (4)**:
+  - `list<T>` — dynamic vector with 24 methods (`push_back`, `pop_front`, `insert`, `index_of`, `contains`, `extend`, …)
+  - `imap` — integer-keyed map with 9 methods (`set`, `get`, `keys`, `values`, `has_value`, …)
+  - `mat4` — 4×4 matrix with 9 instance methods (`mul`, `inverse`, `transpose`, `determinant`, `transform_point`, …)
+  - `quat` — quaternion with 12 instance methods (`mul`, `slerp`, `conjugate`, `normalize`, `rotate`, `to_euler`, …)
+- **New global factories**: `mat4_identity`, `mat4_perspective`, `mat4_orthographic`, `mat4_look_at`, `mat4_translation`, `mat4_scale`, `mat4_rotation_{x,y,z}`, `mat4_rotation_axis`, `mat4_from_quat`, `quat_identity`, `quat_from_axis_angle`, `quat_from_euler`.
+- **New global helpers**: `url_encode`, `url_decode`.
+- **Reader-writer locks on `mutex`**: `lock_shared`, `try_lock_shared`, `unlock_shared`.
+- **`variant.convert`** method.
+- **9 new stdlib snippets** (`listnew`, `imapnew`, `mat4i`, `mat4look`, `mat4persp`, `quati`, `quataxis`, `quateuler`, `move`).
+
+### Files changed
+
+- `data/enma-stdlib.json` — synced from upstream (+81 entries; 819 → 900)
+- `server/src/predefined/enma-stdlib.em.predefined` — regenerated via `npm run regenerate-stdlib` (21 types, 283 methods, 534 globals, 889 LoC)
+- `snippets/stdlib.code-snippets` — +9 snippets (41 → 50)
+
+### Verification
+
+- `npm test` — 936 passing, 2 pending, 0 failing
+- `node tools/validate-predefined.mjs` — 0 diagnostics
+- `node smoke-test.js` — TM grammar tokenises `samples/showcase.em` cleanly
+
+### What did NOT change
+
+`syntaxes/enma.tmLanguage.json`, `language-configuration.json`, `samples/showcase.em`, `snippets/enma.code-snippets`, `smoke-test.js` — already byte-identical to upstream. The new entries are stdlib values, not new language syntax, so no grammar or parser work was needed.
+
+---
+
 ## 1.1.0 — Enma v1.1 language update (Tier 1: tokenizer)
 
 This release adds tokenizer-level support for the Enma v1.1 language spec. Source-code with the new lexical forms now parses without spurious diagnostics from the LSP.
