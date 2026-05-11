@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased — Quieter predefined-shadow diagnostic + in-viewer doc links
+
+### Predefined-shadow diagnostic — Information by default
+
+When the bundled stdlib gains a function (e.g. `url_encode` / `url_decode` from the recent sync) and a user project already has its own implementation with that name, the `EN_PRED_COLLISION` diagnostic used to fire at `Warning` severity in every file that included the user's declaration. With 24 cross-included files this filled the Problems panel.
+
+- **Default severity demoted to `Information`.** The diagnostic is still visible in the Problems panel but no longer inflates file/folder warning counts in the Explorer.
+- **New setting** `enma.diagnostics.predefinedCollisionSeverity`: `"warning" | "information" | "off"`. Default `"information"`. Set `"off"` to suppress entirely; `"warning"` to restore the legacy strict behavior.
+- Per-declaration `[[shadow]]` still suppresses unconditionally regardless of the global setting.
+
+Files: `server/src/inspector/inspector.ts` (settings field), `server/src/inspector/predefinedLoader.ts` (severity parameter), `server/src/inspector/analysisResolver.ts` (pass-through), `server/src/server.ts` (configuration wiring), `package.json` (setting schema).
+
+### Perception API docs viewer — in-viewer link navigation
+
+The TOC and inline cross-references in the bundled Perception docs previously pointed to the upstream GitBook URL (`https://open-2v.gitbook.com/.../#page-XXX`). They now navigate inside the webview using only the `#page-XXX` fragment — each section's wrapper carries the matching `id`.
+
+- 14 TOC entries (Lifecycle / Render / Proc / CPU / Sound / Zydis / Win / Input / Unicorn / Net / GUI / Lifecycle and Routines / etc.) jump to the right section inside the panel.
+- 113 dummy `href="#"` GitBook chrome stubs are unwrapped into `<span>` so they don't act as clickable top-of-page jumps.
+- 21 legitimate external references (to the Enma language reference at `enma-1.gitbook.io`) get `target="_blank" rel="noopener noreferrer"` so VSCode opens them in the user's system browser.
+
+Files: `scripts/build-perception-docs.mjs` (link-rewrite pass), `client/resources/perception-docs.html` (regenerated; 921 → 534 KB).
+
+---
+
 ## Unreleased — In-extension Perception API docs viewer
 
 New command **`Enma: Open Perception API Docs`** (command palette only) opens the bundled API reference in a VSCode side-panel webview. No browser, no internet — the docs ship inside the extension.

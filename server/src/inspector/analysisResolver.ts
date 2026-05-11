@@ -227,7 +227,13 @@ export class AnalysisResolver {
         const ownGlobalScope = new SymbolGlobalScope(record.uri);
         setActiveGlobalScope(ownGlobalScope);
         if (predefinedRecords.length > 0) {
-            mergePredefinedIntoScope(ownGlobalScope, predefinedRecords);
+            // Step 1 (own-only) drops its diagnostics; severity doesn't matter
+            // but pass the user's choice anyway to keep the call sites symmetric.
+            mergePredefinedIntoScope(
+                ownGlobalScope,
+                predefinedRecords,
+                settings?.predefinedCollisionSeverity ?? 'information',
+            );
         }
         try {
             hoistAfterParsed(record.ast, ownGlobalScope);
@@ -274,7 +280,11 @@ export class AnalysisResolver {
         setActiveGlobalScope(globalScope);
 
         const collisionDiags = predefinedRecords.length > 0
-            ? mergePredefinedIntoScope(globalScope, predefinedRecords)
+            ? mergePredefinedIntoScope(
+                globalScope,
+                predefinedRecords,
+                settings?.predefinedCollisionSeverity ?? 'information',
+            )
             : [];
 
         try {

@@ -147,6 +147,7 @@ args = ["enma-lsp", "--stdio"]
 | `enma.permissions.file` | boolean | `false` | Allow file-system intrinsics without a permission error |
 | `enma.parser.strict` | boolean | `false` | Reject all kill-rule recoveries (§A1) — defaults to `false` until 95% corpus threshold |
 | `enma.analyzer.severity` | string | `"error"` | Global severity for non-exempt analyzer diagnostics (`"error"` or `"warning"`) |
+| `enma.diagnostics.predefinedCollisionSeverity` | string | `"information"` | Severity for "user symbol shadows bundled predefined" — `"warning"`, `"information"`, or `"off"`. Per-declaration `[[shadow]]` always suppresses regardless. |
 | `enma.forceIncludePredefined` | array | `[]` | Additional `.em.predefined` files with forceInclude precedence |
 | `enma.formatter.enabled` | boolean | `true` | Enable the document formatter |
 | `enma.formatter.indentSpaces` | number | `4` | Spaces per indent level |

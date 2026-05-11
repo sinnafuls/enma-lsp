@@ -212,18 +212,30 @@ function hasShadowAnnotation(holder: SymbolObjectHolder): boolean {
 }
 
 /**
+ * Severity selector for predefined-shadow diagnostics. Mirrors the
+ * `enma.diagnostics.predefinedCollisionSeverity` workspace setting.
+ *   'warning'     — emit as DiagnosticSeverity.Warning (legacy, strict)
+ *   'information' — emit as DiagnosticSeverity.Information (default; visible
+ *                   in Problems panel but doesn't inflate file/folder warning
+ *                   counts)
+ *   'off'         — suppress entirely
+ */
+export type PredefinedCollisionSeverity = 'warning' | 'information' | 'off';
+
+/**
  * Merge a set of predefined records into a target global scope, applying
  * §A10 precedence and emitting AC-21/AC-21b collision diagnostics.
  *
  * Records must be sorted by ascending ORIGIN_RANK (bundled first, workspace last).
  * Higher-rank records win on name collision. If the winner has `[[shadow]]`,
- * the AC-21 warning is suppressed.
+ * the diagnostic is suppressed regardless of severity.
  *
- * @returns array of collision Warning diagnostics (for the calling file's record).
+ * @returns array of collision diagnostics (for the calling file's record).
  */
 export function mergePredefinedIntoScope(
     target: SymbolGlobalScope,
     records: readonly PredefinedRecord[],
+    collisionSeverity: PredefinedCollisionSeverity = 'information',
 ): lsp.Diagnostic[] {
     const collisionDiags: lsp.Diagnostic[] = [];
 
@@ -261,12 +273,15 @@ export function mergePredefinedIntoScope(
                 // Check for [[shadow]] on the incoming declaration.
                 const suppress = hasShadowAnnotation(incoming);
 
-                if (!suppress) {
-                    // AC-21: emit Warning at the higher-precedence declaration site.
+                if (!suppress && collisionSeverity !== 'off') {
+                    // AC-21: emit diagnostic at the higher-precedence declaration site.
                     const incomingLoc = getHolderLocation(incoming, rec.uri);
                     if (incomingLoc !== undefined) {
+                        const severityEnum = collisionSeverity === 'warning'
+                            ? lsp.DiagnosticSeverity.Warning
+                            : lsp.DiagnosticSeverity.Information;
                         collisionDiags.push({
-                            severity: lsp.DiagnosticSeverity.Warning,
+                            severity: severityEnum,
                             range: makeRange(incomingLoc),
                             message: `'${name}' shadows a ${existing.origin} predefined symbol (use [[shadow]] to suppress)`,
                             code: 'EN_PRED_COLLISION',

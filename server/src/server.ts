@@ -1,7 +1,7 @@
 import * as lsp from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import * as fs from 'node:fs';
-import { Inspector, InspectRecord } from './inspector/inspector';
+import { Inspector, InspectRecord, InspectorSettings } from './inspector/inspector';
 
 import { provideHover } from './services/hover';
 import { provideCompletion } from './services/completion';
@@ -115,16 +115,35 @@ connection.onDidChangeConfiguration(() => {
 });
 
 async function applyEnmaConfiguration(): Promise<void> {
-    let cfg: { implicitMutualInclusion?: boolean } | undefined;
+    interface EnmaCfg {
+        implicitMutualInclusion?: boolean;
+        diagnostics?: { predefinedCollisionSeverity?: 'warning' | 'information' | 'off' };
+    }
+    let cfg: EnmaCfg | undefined;
     try {
         cfg = await connection.workspace.getConfiguration('enma');
     } catch {
         return;
     }
     if (cfg === undefined || cfg === null) return;
+
+    const current = inspector.getSettings();
+    const partial: Partial<InspectorSettings> = {};
+
     const flag = cfg.implicitMutualInclusion === true;
-    if (flag !== inspector.getSettings().implicitMutualInclusion) {
-        inspector.updateSettings({ implicitMutualInclusion: flag });
+    if (flag !== current.implicitMutualInclusion) {
+        partial.implicitMutualInclusion = flag;
+    }
+
+    const sev = cfg.diagnostics?.predefinedCollisionSeverity;
+    if (sev === 'warning' || sev === 'information' || sev === 'off') {
+        if (sev !== current.predefinedCollisionSeverity) {
+            partial.predefinedCollisionSeverity = sev;
+        }
+    }
+
+    if (Object.keys(partial).length > 0) {
+        inspector.updateSettings(partial);
     }
 }
 

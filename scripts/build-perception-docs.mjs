@@ -90,6 +90,39 @@ html = html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '');
 //     They're useless without their scripts and they steal click events.
 html = html.replace(/<button\b[^>]*>[\s\S]*?<\/button>/gi, '');
 
+// 5d. Rewrite GitBook self-links so they navigate inside the webview instead
+//     of opening the external gitbook.com URL. The TOC and inline cross-refs
+//     produce hrefs like
+//        https://open-2v.gitbook.com/~space/.../~gitbook/pdf?limit=100&back=false#page-XXX
+//     Each section's wrapper has id="page-XXX", so the fragment alone is enough
+//     for in-page navigation. Keep the leading-hash form.
+html = html.replace(
+    /href="https?:\/\/[^"]*?#(page-[A-Za-z0-9]+)"/g,
+    'href="#$1"',
+);
+// Drop any remaining absolute hrefs to gitbook (no fragment) — they'd 404 in
+// the webview since enableScripts is false and we can't bounce them out.
+html = html.replace(
+    /href="https?:\/\/(?:open-2v\.gitbook\.com|app\.gitbook\.com)\/[^"]*"/g,
+    'href="#"',
+);
+
+// External links to the Enma language docs (or any non-gitbook-export domain)
+// should open in the user's system browser, not navigate the webview. Mark
+// them target="_blank" so VSCode's webview link handler routes them out.
+html = html.replace(
+    /<a\s+([^>]*?)href="(https?:\/\/[^"]+)"([^>]*)>/g,
+    '<a $1href="$2"$3 target="_blank" rel="noopener noreferrer">',
+);
+
+// Unwrap clicker-bait <a href="#"> shells (gitbook chapter-nav / theme chrome
+// stubs) — turn them into plain spans so they're not styled as links and don't
+// jump to top when clicked.
+html = html.replace(
+    /<a\b[^>]*href="#"[^>]*>([\s\S]*?)<\/a>/g,
+    '<span>$1</span>',
+);
+
 // 6. Strip HTML comments (often <!-- --> placeholders left by the framework).
 html = html.replace(/<!--[\s\S]*?-->/g, '');
 

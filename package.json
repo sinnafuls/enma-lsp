@@ -284,6 +284,16 @@
           "default": "error",
           "description": "Global severity for non-exempt analyzer diagnostics (§R21 rollback knob)."
         },
+        "enma.diagnostics.predefinedCollisionSeverity": {
+          "type": "string",
+          "enum": [
+            "warning",
+            "information",
+            "off"
+          ],
+          "default": "information",
+          "description": "Severity for the diagnostic that fires when a user-defined symbol shadows a bundled predefined symbol (e.g. you define your own url_encode after the stdlib added one). 'warning' (legacy, strict), 'information' (default — visible in Problems but quiet), 'off' (suppress). Per-declaration [[shadow]] always silences regardless."
+        },
         "enma.forceIncludePredefined": {
           "type": "array",
           "default": [],

@@ -70,6 +70,8 @@ export interface InspectorSettings {
     forceIncludePredefined: string[];
     /** Number of parent directories to scan (non-recursively) for *.em.predefined during walk-up discovery. 0 = disabled. */
     walkUpDepth: number;
+    /** Severity for "user symbol shadows bundled predefined symbol" diagnostics. */
+    predefinedCollisionSeverity: 'warning' | 'information' | 'off';
 }
 
 export const defaultInspectorSettings: InspectorSettings = {
@@ -79,6 +81,9 @@ export const defaultInspectorSettings: InspectorSettings = {
     implicitMutualInclusion: false,
     forceIncludePredefined: [],
     walkUpDepth: 4,
+    // Quiet by default — stdlib growth shouldn't spam the Problems panel.
+    // Users who want strict shadowing detection can flip to 'warning'.
+    predefinedCollisionSeverity: 'information',
 };
 
 // ---- Per-URI record ----------------------------------------------------
