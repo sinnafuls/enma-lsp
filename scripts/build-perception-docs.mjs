@@ -126,6 +126,198 @@ html = html.replace(
 // 6. Strip HTML comments (often <!-- --> placeholders left by the framework).
 html = html.replace(/<!--[\s\S]*?-->/g, '');
 
+// 6b. Re-highlight code blocks using Enma's keyword set.
+//
+// The source HTML's shiki spans reference GitBook CSS vars that don't ship
+// (--tint-11, --tint-12), so every token rendered as inherited foreground —
+// effectively unstyled monospace. We replace each <pre><code> body with a
+// freshly tokenised representation using Enma's reserved word list.
+//
+// CSS for the .hl-* classes is added below in the injected stylesheet.
+
+// Canonical Enma keyword / primitive sets — kept in lockstep with
+// server/src/compiler_tokenizer/reservedWord.ts. Don't add to this list
+// without also adding upstream; the highlighter is a derived view.
+const ENMA_PRIMITIVES = new Set([
+    'int8', 'int16', 'int32', 'int64',
+    'uint8', 'uint16', 'uint32', 'uint64',
+    'aint8', 'aint16', 'aint32', 'aint64',
+    'float32', 'float', 'float64', 'double',
+    'char', 'wchar', 'bool', 'string', 'wstring', 'void', 'size_t',
+    'auto', 'nullable',
+    // common Enma stdlib container types — colour as types in docs
+    'array', 'map', 'imap', 'list', 'hash_set', 'sorted_map',
+    'vec2', 'vec3', 'vec4', 'quat', 'mat4', 'variant',
+    'mutex', 'lock_guard', 'cond_var', 'atomic_int32', 'atomic_int64',
+    'file_t', 'regex', 'json_value', 'coroutine_t',
+    // Perception API types
+    'proc_t', 'vad_region_t', 'cpu_t', 'frame_t', 'layer_t', 'widget_t',
+    'button_t', 'checkbox_t', 'label_t', 'slider_t', 'menu_t',
+    'sidebar_section_t', 'file_picker_t', 'zydis_req_t', 'zydis_builder_t',
+    'color',
+]);
+const ENMA_KEYWORDS = new Set([
+    'if', 'else', 'for', 'while', 'do', 'switch', 'match', 'case', 'default',
+    'break', 'continue', 'return', 'goto', 'try', 'catch', 'throw', 'defer', 'yield',
+    'class', 'struct', 'interface', 'enum', 'namespace', 'using', 'template',
+    'typedef', 'decltype', 'typename', 'mixin', 'import', 'extern', 'delegate',
+    'property', 'operator', 'coroutine',
+    'static', 'const', 'constexpr', 'override', 'public', 'private',
+    'out', 'inline', 'volatile', 'get', 'set', 'final', 'virtual', 'friend',
+    'true', 'false', 'null', 'nullptr', 'this',
+    'new', 'delete', 'sizeof', 'offsetof', 'static_assert', 'cast',
+    'static_cast', 'reinterpret_cast', 'const_cast',
+]);
+
+/** Decode a small set of HTML entities found in our code blocks. */
+function decodeEntities(s) {
+    return s
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+}
+
+/** Escape plain text for safe HTML embedding. */
+function escapeHtml(s) {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/**
+ * Tokenise Enma source into highlight spans. Tolerant — anything we don't
+ * recognise gets emitted as plain (unwrapped) text.
+ */
+function highlightEnma(src) {
+    let out = '';
+    let i = 0;
+    const n = src.length;
+    while (i < n) {
+        const c = src[i];
+
+        // Line comment.
+        if (c === '/' && src[i + 1] === '/') {
+            let j = i;
+            while (j < n && src[j] !== '\n') j++;
+            out += `<span class="hl-com">${escapeHtml(src.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+        // Block comment.
+        if (c === '/' && src[i + 1] === '*') {
+            const end = src.indexOf('*/', i + 2);
+            const j = end < 0 ? n : end + 2;
+            out += `<span class="hl-com">${escapeHtml(src.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+        // String / f-string.
+        if (c === '"' || (c === 'f' && src[i + 1] === '"')) {
+            const start = c === 'f' ? i + 1 : i;
+            let j = start + 1;
+            while (j < n) {
+                if (src[j] === '\\' && j + 1 < n) { j += 2; continue; }
+                if (src[j] === '"') { j++; break; }
+                if (src[j] === '\n') break;
+                j++;
+            }
+            out += `<span class="hl-str">${escapeHtml(src.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+        // Char literal.
+        if (c === "'") {
+            let j = i + 1;
+            while (j < n && src[j] !== "'" && src[j] !== '\n') {
+                if (src[j] === '\\' && j + 1 < n) j++;
+                j++;
+            }
+            if (j < n && src[j] === "'") j++;
+            out += `<span class="hl-str">${escapeHtml(src.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+        // Annotation [[...]].
+        if (c === '[' && src[i + 1] === '[') {
+            const end = src.indexOf(']]', i + 2);
+            if (end >= 0) {
+                const j = end + 2;
+                out += `<span class="hl-ann">${escapeHtml(src.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+        }
+        // Number (decimal / hex / binary), with optional separators / dot / exponent / suffix.
+        if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(src[i + 1] || ''))) {
+            let j = i;
+            // 0x / 0b prefix
+            if (src[j] === '0' && (src[j + 1] === 'x' || src[j + 1] === 'X' || src[j + 1] === 'b' || src[j + 1] === 'B')) {
+                j += 2;
+                while (j < n && /[0-9a-fA-F_]/.test(src[j])) j++;
+            } else {
+                while (j < n && /[0-9_]/.test(src[j])) j++;
+                if (src[j] === '.') {
+                    j++;
+                    while (j < n && /[0-9_]/.test(src[j])) j++;
+                }
+                if (src[j] === 'e' || src[j] === 'E') {
+                    j++;
+                    if (src[j] === '+' || src[j] === '-') j++;
+                    while (j < n && /[0-9_]/.test(src[j])) j++;
+                }
+            }
+            // suffix (f, u, etc.)
+            while (j < n && /[fFuUlL]/.test(src[j])) j++;
+            out += `<span class="hl-num">${escapeHtml(src.slice(i, j))}</span>`;
+            i = j;
+            continue;
+        }
+        // Identifier / keyword.
+        if (/[A-Za-z_]/.test(c)) {
+            let j = i + 1;
+            while (j < n && /[A-Za-z0-9_]/.test(src[j])) j++;
+            const word = src.slice(i, j);
+            // Look ahead for '(' (function call) — skip whitespace.
+            let k = j;
+            while (k < n && (src[k] === ' ' || src[k] === '\t')) k++;
+            const isCall = src[k] === '(';
+
+            let cls = null;
+            if (ENMA_PRIMITIVES.has(word)) cls = 'hl-ty';
+            else if (ENMA_KEYWORDS.has(word)) cls = 'hl-kw';
+            else if (isCall) cls = 'hl-fn';
+
+            out += cls
+                ? `<span class="${cls}">${escapeHtml(word)}</span>`
+                : escapeHtml(word);
+            i = j;
+            continue;
+        }
+        // Default: punctuation / whitespace — emit one char as escaped.
+        out += escapeHtml(c);
+        i++;
+    }
+    return out;
+}
+
+/**
+ * Replace each <pre>...<code>...</code></pre> body with re-highlighted markup.
+ * Extracts the plain text by stripping all inner tags, then tokenises.
+ */
+html = html.replace(
+    /(<pre\b[^>]*>\s*<code\b[^>]*>)([\s\S]*?)(<\/code>\s*<\/pre>)/g,
+    (_match, open, body, close) => {
+        // Strip all tags, then decode entities.
+        const plain = decodeEntities(body.replace(/<[^>]+>/g, ''));
+        // Drop the GitBook "table" class on <code> so display:block CSS applies cleanly.
+        const cleanOpen = open.replace(/<code\b[^>]*>/, '<code>');
+        return `${cleanOpen}${highlightEnma(plain)}${close}`;
+    },
+);
+
 // 7. Strip event-handler attributes (onclick=, onload=, etc.) defensively.
 html = html.replace(/\s+on[a-z]+\s*=\s*"[^"]*"/gi, '');
 html = html.replace(/\s+on[a-z]+\s*=\s*'[^']*'/gi, '');
@@ -252,12 +444,41 @@ span.highlight-line {
 span.highlight-line-content { white-space: pre; }
 /* Override per-token light-mode colours from inline style attributes —
    shiki inlines style="color: light-dark(rgb(var(--tint-11)), ...)" on every
-   span, which falls back to unset without GitBook's variable definitions. */
+   span, which falls back to unset without GitBook's variable definitions.
+   Our own .hl-* spans take precedence via higher specificity below. */
 pre span[style],
 span.highlight-line span,
 span.highlight-line-content span {
     color: inherit !important;
 }
+
+/* Build-time Enma syntax colouring. Uses VSCode symbol-icon foreground
+   tokens (which webviews DO expose) with Dark+ defaults as fallbacks. */
+pre code .hl-kw  { color: var(--vscode-symbolIcon-keywordForeground,  #C586C0); }
+pre code .hl-ty  { color: var(--vscode-symbolIcon-classForeground,    #4EC9B0); }
+pre code .hl-fn  { color: var(--vscode-symbolIcon-functionForeground, #DCDCAA); }
+pre code .hl-str { color: var(--vscode-symbolIcon-stringForeground,   #CE9178); }
+pre code .hl-num { color: var(--vscode-symbolIcon-numberForeground,   #B5CEA8); }
+pre code .hl-com { color: var(--vscode-symbolIcon-textForeground,     #6A9955); font-style: italic; }
+pre code .hl-ann { color: var(--vscode-symbolIcon-variableForeground, #9CDCFE); }
+/* Specificity bump: the generic "pre span[style] { color: inherit !important }"
+   above would otherwise win against our class rules. .hl-* spans have no inline
+   style attribute, so we just need any rule to land — but we use !important
+   defensively in case some fragment slips through with a style attr. */
+pre code span.hl-kw,
+pre code span.hl-ty,
+pre code span.hl-fn,
+pre code span.hl-str,
+pre code span.hl-num,
+pre code span.hl-com,
+pre code span.hl-ann { color: inherit; }
+pre code span.hl-kw  { color: var(--vscode-symbolIcon-keywordForeground,  #C586C0) !important; }
+pre code span.hl-ty  { color: var(--vscode-symbolIcon-classForeground,    #4EC9B0) !important; }
+pre code span.hl-fn  { color: var(--vscode-symbolIcon-functionForeground, #DCDCAA) !important; }
+pre code span.hl-str { color: var(--vscode-symbolIcon-stringForeground,   #CE9178) !important; }
+pre code span.hl-num { color: var(--vscode-symbolIcon-numberForeground,   #B5CEA8) !important; }
+pre code span.hl-com { color: #6A9955 !important; font-style: italic; }
+pre code span.hl-ann { color: var(--vscode-symbolIcon-variableForeground, #9CDCFE) !important; }
 
 /* Tables (used for parameter/return-value lists in some sections). */
 table {
