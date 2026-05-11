@@ -62,8 +62,32 @@ class proc_t {
     bool wws(uint64 addr, string text);
 
     // Bulk read/write
-    array<uint8> rvm(uint64 addr, int64 size);
+    array<uint8> rvm(uint64 addr, uint64 size);
     bool wvm(uint64 addr, array<uint8> bytes);
+
+    // Typed vector / quaternion / matrix reads (gated: read_memory)
+    vec2 read_vec2_fl32(uint64 addr);
+    vec2 read_vec2_fl64(uint64 addr);
+    vec3 read_vec3_fl32(uint64 addr);
+    vec3 read_vec3_fl64(uint64 addr);
+    vec4 read_vec4_fl32(uint64 addr);
+    vec4 read_vec4_fl64(uint64 addr);
+    quat read_quat_fl32(uint64 addr);
+    quat read_quat_fl64(uint64 addr);
+    mat4 read_mat4_fl32(uint64 addr);
+    mat4 read_mat4_fl64(uint64 addr);
+
+    // Typed vector / quaternion / matrix writes (gated: write_memory)
+    bool write_vec2_fl32(uint64 addr, vec2 v);
+    bool write_vec2_fl64(uint64 addr, vec2 v);
+    bool write_vec3_fl32(uint64 addr, vec3 v);
+    bool write_vec3_fl64(uint64 addr, vec3 v);
+    bool write_vec4_fl32(uint64 addr, vec4 v);
+    bool write_vec4_fl64(uint64 addr, vec4 v);
+    bool write_quat_fl32(uint64 addr, quat q);
+    bool write_quat_fl64(uint64 addr, quat q);
+    bool write_mat4_fl32(uint64 addr, mat4 m);
+    bool write_mat4_fl64(uint64 addr, mat4 m);
 
     // SIMD-width reads/writes
     array<uint8> r128(uint64 addr);
@@ -75,13 +99,13 @@ class proc_t {
 
     // Modules and exports
     uint64 get_module_base(string name);
-    int64 get_module_size(string name);
+    uint64 get_module_size(string name);
     uint64 get_proc_address(uint64 module_base, string export_name);
     uint64 get_import_rdata_address(uint64 module_base, string import_name);
 
     // Pattern scanning
-    uint64 find_code_pattern(uint64 search_start, int64 search_size, string sig);
-    array<uint64> find_all_code_patterns(uint64 search_start, int64 search_size, string sig);
+    uint64 find_code_pattern(uint64 search_start, uint64 search_size, string sig);
+    array<uint64> find_all_code_patterns(uint64 search_start, uint64 search_size, string sig);
 
     // Threads
     array<uint64> get_all_tebs();
@@ -103,14 +127,17 @@ class proc_t {
     array<uint64> scan_double(float64 value, bool heap_only);
 
     // VM alloc / free (gated: virtual_memory_operations)
-    uint64 alloc_vm(int64 size);
+    uint64 alloc_vm(uint64 size);
     bool free_vm(uint64 address);
+
+    // Kernel pointer (gated: kernel_rw_access)
+    uint64 get_eprocess();
 }
 
 class vad_region_t {
     uint64 start();
-    int64 size();
-    int64 protection();
+    uint64 size();
+    uint64 protection();
     bool heap_likely();
 }
 
@@ -141,7 +168,7 @@ string ampm(int64 hour24);
 // The old bits_f32_to_u32 / bits_u32_to_f32 / bits_f64_to_u64 /
 // bits_u64_to_f64 natives have been removed.
 
-bool set_thread_priority(int64 p);
+bool set_thread_priority(thread_priority p);
 
 enum thread_priority {
     lowest,
@@ -292,7 +319,7 @@ class tabs_t {
 }
 
 class keybind_t {
-    void bind(int64 vk, bool ctrl, bool shift, bool alt, int64 mode);
+    void bind(int64 vk, bool ctrl, bool shift, bool alt, keybind_mode mode);
     bool is_active();
     int64 binding_count();
     void set_active(bool active);
@@ -360,9 +387,9 @@ class colorpicker_t {
 class sidebar_section_t {
     void set_active(bool active);
 
-    label_t           create_label(string text, int64 align);
+    label_t           create_label(string text, ui_align align);
     void              create_separator();
-    button_t          create_button(string label, int64 align);
+    button_t          create_button(string label, ui_align align);
     checkbox_t        create_checkbox(string label, bool initial);
     slider_t          create_slider(string label, float64 initial, float64 minv, float64 maxv, float64 step);
     slider_icon_t     create_slider_icon(string icon, float64 initial, float64 minv, float64 maxv, float64 step);
@@ -484,7 +511,7 @@ void set_dark_theme(bool dark);
 color get_theme_color(int64 color_hash);
 void set_theme_color(int64 color_hash, color c);
 
-void show_toast(int64 kind, string title, string msg);
+void show_toast(toast_kind kind, string title, string msg);
 bool gui_active();
 vec2 get_gui_size();
 vec2 get_gui_position();
@@ -769,23 +796,23 @@ void stop_all_sounds();
 // ============================================================================
 
 class cpu_t {
-    bool mem_map(int64 addr, int64 size, int64 perms);
+    bool mem_map(int64 addr, int64 size, uc_prot perms);
     bool mem_write(int64 addr, array<uint8> bytes);
     array<uint8> mem_read(int64 addr, int64 size);
 
-    bool reg_write64(int64 reg, int64 value);
-    int64 reg_read64(int64 reg);
-    bool reg_write128(int64 reg, array<uint8> bytes);
-    array<uint8> reg_read128(int64 reg);
-    bool reg_write256(int64 reg, array<uint8> bytes);
-    array<uint8> reg_read256(int64 reg);
+    bool reg_write64(uc_reg reg, int64 value);
+    int64 reg_read64(uc_reg reg);
+    bool reg_write128(uc_reg reg, array<uint8> bytes);
+    array<uint8> reg_read128(uc_reg reg);
+    bool reg_write256(uc_reg reg, array<uint8> bytes);
+    array<uint8> reg_read256(uc_reg reg);
 
     int64 start(int64 begin, int64 end, int64 timeout, int64 count);
     void emu_stop();
     bool flush_code();
     bool setup_stack(int64 base, int64 size, int64 stop_addr);
 
-    bool hook_add(int64 hook_kind, int64 fn_handle);
+    bool hook_add(uc_hook hook_kind, int64 fn_handle);
 
     int64 get_last_exception();
     int64 get_exception_address();
@@ -879,21 +906,21 @@ void send_mouse_input(int64 dx, int64 dy, int64 flags, int64 mouse_data);
 
 class zydis_req_t {
     void set_mnemonic(int64 mnemonic);
-    void set_machine_mode(int64 mode);
+    void set_machine_mode(zydis_machine_mode mode);
     void set_operand_count(int64 count);
-    void set_branch_type(int64 type);
-    void set_branch_width(int64 width);
+    void set_branch_type(zydis_branch_type type);
+    void set_branch_width(zydis_branch_width width);
     void set_operand_reg(int64 idx, int64 reg);
     void set_operand_imm(int64 idx, int64 imm);
     void set_operand_mem(int64 idx, int64 base, int64 idx_reg, int64 scale, int64 disp, int64 size);
     void set_operand_ptr(int64 idx, int64 segment, int64 offset);
     int64 get_mnemonic();
-    int64 get_machine_mode();
+    zydis_machine_mode get_machine_mode();
     int64 get_operand_count();
 }
 
 class zydis_builder_t {
-    void set_machine_mode(int64 mode);
+    void set_machine_mode(zydis_machine_mode mode);
     void set_base_address(int64 addr);
     void clear();
     void push(zydis_req_t req);

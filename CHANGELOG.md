@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased — Perception predefined sync (typed read/write + enum params)
+
+Tracks the latest Perception API documentation (GitBook HTML, 2026-05-11). All changes are type-tightening + new method additions; no surface removed.
+
+### Proc API
+
+- **New typed read/write helpers (22 methods)** on `proc_t`:
+  - Reads: `read_vec2_fl32 / read_vec2_fl64`, `read_vec3_*`, `read_vec4_*`, `read_quat_*`, `read_mat4_*`
+  - Writes: `write_vec2_fl32 / write_vec2_fl64`, `write_vec3_*`, `write_vec4_*`, `write_quat_*`, `write_mat4_*`
+- **New kernel pointer**: `uint64 get_eprocess()` (gated: `kernel_rw_access`).
+- **Type corrections** (`int64` → `uint64`): `rvm` size param, `alloc_vm` size param, `find_code_pattern` / `find_all_code_patterns` `search_size` param, `get_module_size` return.
+- **`vad_region_t`**: `size()` and `protection()` return `uint64` (was `int64`).
+
+### CPU / GUI / Unicorn / Zydis API — int64 → named-enum promotions
+
+- `set_thread_priority(int64)` → `set_thread_priority(thread_priority)`
+- `show_toast(int64 kind, ...)` → `show_toast(toast_kind kind, ...)`
+- `sidebar_section_t.create_label / create_button` — `int64 align` → `ui_align align`
+- `keybind_t.bind(..., int64 mode)` → `keybind_mode mode`
+- `cpu_t.reg_read{64,128,256} / reg_write{64,128,256}` — `int64 reg` → `uc_reg reg`
+- `cpu_t.mem_map(..., int64 perms)` → `uc_prot perms`
+- `cpu_t.hook_add(int64 hook_kind, ...)` → `uc_hook hook_kind`
+- `zydis_req_t.set_machine_mode / set_branch_type / set_branch_width` — int64 → `zydis_machine_mode` / `zydis_branch_type` / `zydis_branch_width`
+- `zydis_req_t.get_machine_mode()` returns `zydis_machine_mode`
+- `zydis_builder_t.set_machine_mode(int64)` → `zydis_machine_mode`
+
+### Files changed
+
+- `server/src/predefined/perception.em.predefined` — surgical patches (no mass regen)
+- `example/perception.em.predefined` — kept in lock-step with canonical
+
+### Verification
+
+- `npm test` — 936 passing, 0 failing
+- `node tools/validate-predefined.mjs` — OK, example copy matches canonical
+
+### Notes
+
+The GitBook HTML also documents per-leaf-widget decomposition of generic widget methods (`set_pos`, `set_size`, `install_hook`, …) that currently live only on `widget_t`. The extraction was unreliable on those (mixed usage examples with declarations), so the decomposition is deferred until we can pull the upstream source-of-truth. Existing `widget_t` declarations remain valid.
+
+---
+
 ## 1.1.9 — Upstream stdlib sync (list / imap / mat4 / quat)
 
 Tracks the latest upstream `enma-stdlib.json` from the language owner's reference extension. The bundled stdlib grows from 819 → 900 entries (+9.9%); all completion, hover, signature help, and type-checker paths pick up the new symbols automatically via the auto-regenerated `enma-stdlib.em.predefined`.
