@@ -67,5 +67,9 @@ VSCODE-PLUGIN-WORKSPACE.md
 shipped/**
 ship_source/**
 
+# --- Source HTML for the bundled docs (920 KB) — only the stripped output
+# at client/resources/perception-docs.html ships in the VSIX ---
+data/perception-docs.source.html
+
 # --- Already-packaged .vsix files ---
 *.vsix

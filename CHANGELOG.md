@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — In-extension Perception API docs viewer
+
+New command **`Enma: Open Perception API Docs`** (command palette only) opens the bundled API reference in a VSCode side-panel webview. No browser, no internet — the docs ship inside the extension.
+
+### How it works
+
+- Source: GitBook HTML export at `data/perception-docs.source.html` (kept in repo for diff visibility but excluded from the VSIX via `.vscodeignore`).
+- Strip step: `scripts/build-perception-docs.mjs` removes `<head>`, all scripts/styles/links, the empty "Untitled" cover page, and any references to the missing local asset folder. Injects a VSCode-theme-aware stylesheet so light/dark themes are respected automatically.
+- Bundled output: `client/resources/perception-docs.html` (ships in the extension; ~777 KB).
+- Webview is created with `enableScripts: false`, a CSP that bans scripts (`default-src 'none'; style-src 'unsafe-inline'`), and `retainContextWhenHidden: true` so scroll position survives focus switches.
+- Single-instance: clicking the command again reveals the existing panel rather than opening a duplicate.
+
+### Files
+
+- `scripts/build-perception-docs.mjs` (new) — strip pipeline; wired into `vscode:prepublish`.
+- `client/src/docsViewer.ts` (new) — webview command implementation.
+- `client/resources/perception-docs.html` (new, generated) — themed, script-free docs.
+- `client/src/extension.ts` — registers the command at activation.
+- `package.json` — adds `enma.openDocs` command + activation event + `build-perception-docs` script.
+- `.vscodeignore` — excludes the 920 KB source HTML from the VSIX.
+
+To refresh the bundle after the upstream HTML changes, drop the new export into `data/perception-docs.source.html` and run `npm run build-perception-docs`.
+
+---
+
 ## Unreleased — Perception predefined sync (typed read/write + enum params)
 
 Tracks the latest Perception API documentation (GitBook HTML, 2026-05-11). All changes are type-tightening + new method additions; no surface removed.

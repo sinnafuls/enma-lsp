@@ -62,6 +62,7 @@ The extension ships a recursive `#include` resolver that flattens an Enma projec
 | `Enma: Bundle a configured project`     | —                  | Pick from `enma.projects` |
 | `Enma: Bundle all configured projects`  | —                  | Run every entry in `enma.projects` |
 | `Enma: Initialize Enma project`         | —                  | Scaffold `source/main.em` + `.vscode/tasks.json` |
+| `Enma: Open Perception API Docs`        | —                  | Open the bundled Perception API reference in a side-panel webview (no browser needed) |
 
 ### Settings
 

@@ -1,0 +1,258 @@
+// Strip the GitBook-exported Perception docs HTML for in-extension viewing.
+//
+// Input:  data/perception-docs.source.html  (saved-page HTML from GitBook)
+// Output: client/resources/perception-docs.html  (clean, themable, no scripts)
+//
+// What this script removes:
+//   - <head> entirely (replaced with a minimal CSP-clean head)
+//   - all <script>, <link>, <style>, <noscript> tags
+//   - everything before the first content page <div id="page-...">
+//   - the "Untitled" cover h1 (GitBook puts this above the real content)
+//   - external asset references that point to perceptioin_docs_files/* (the
+//     asset folder isn't shipped — links would 404)
+//
+// What this script injects:
+//   - a CSP <meta> that bans scripts (defence in depth — webview also sets CSP)
+//   - one inline <style> that:
+//       * resets the GitBook print-page container (no shadow, no max-width,
+//         no white background, no min-height)
+//       * provides fallback values for the GitBook --tint-*, --primary-*,
+//         --neutral-* CSS variables using VSCode theme tokens
+//       * styles headings, code blocks, and tables cleanly
+//
+// Run: node scripts/build-perception-docs.mjs
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, '..');
+
+const SRC = path.join(repoRoot, 'data', 'perception-docs.source.html');
+const OUT_DIR = path.join(repoRoot, 'client', 'resources');
+const OUT = path.join(OUT_DIR, 'perception-docs.html');
+
+if (!fs.existsSync(SRC)) {
+    console.error(`build-perception-docs: ERROR — ${SRC} not found`);
+    process.exit(1);
+}
+
+const raw = fs.readFileSync(SRC, 'utf8');
+const inputBytes = raw.length;
+
+let html = raw;
+
+// 1. Drop everything before the first content page.
+//    Each chapter is wrapped in <div id="page-XXXX" class="my-11 ... bg-white ...">
+//    The first one contains "Enma - Overview".
+const firstPageIdx = html.search(/<div id="page-[A-Za-z0-9]+"[^>]*class="[^"]*max-w-4xl/);
+if (firstPageIdx < 0) {
+    console.error('build-perception-docs: ERROR — could not locate first content page');
+    process.exit(1);
+}
+html = html.slice(firstPageIdx);
+
+// 2. Drop everything after the last </div></body> chain. Find the closing body.
+const bodyCloseIdx = html.lastIndexOf('</body>');
+if (bodyCloseIdx > 0) {
+    html = html.slice(0, bodyCloseIdx);
+}
+
+// 3. Strip all <script ...>...</script>, <link ...>, <style ...>...</style>,
+//    <noscript>...</noscript>. Tolerate self-closing and missing close tags.
+html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+html = html.replace(/<script\b[^>]*\/?>/gi, '');
+html = html.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+html = html.replace(/<link\b[^>]*\/?>/gi, '');
+html = html.replace(/<noscript\b[^>]*>[\s\S]*?<\/noscript>/gi, '');
+
+// 4. Strip references to the missing asset folder so the page never tries
+//    to fetch perceptioin_docs_files/*.css|js|woff2|svg.
+html = html.replace(/perceptioin_docs_files\/[^"' )]+/g, '');
+
+// 5. Drop any <img>/<source>/<video>/<iframe> entirely — they reference
+//    missing local assets.
+html = html.replace(/<img\b[^>]*\/?>/gi, '');
+html = html.replace(/<source\b[^>]*\/?>/gi, '');
+html = html.replace(/<video\b[^>]*>[\s\S]*?<\/video>/gi, '');
+html = html.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '');
+html = html.replace(/<iframe\b[^>]*\/?>/gi, '');
+
+// 6. Strip HTML comments (often <!-- --> placeholders left by the framework).
+html = html.replace(/<!--[\s\S]*?-->/g, '');
+
+// 7. Strip event-handler attributes (onclick=, onload=, etc.) defensively.
+html = html.replace(/\s+on[a-z]+\s*=\s*"[^"]*"/gi, '');
+html = html.replace(/\s+on[a-z]+\s*=\s*'[^']*'/gi, '');
+
+// 8. Strip the "Untitled" cover h1 if it leaked into our slice.
+html = html.replace(/<h1[^>]*>Untitled<\/h1>/g, '');
+
+// 9. Compose final document. Inject themable CSS and a script-banning CSP.
+const css = `
+:root {
+    color-scheme: light dark;
+
+    /* VSCode theme tokens with sane fallbacks. */
+    --fg:       var(--vscode-foreground, #cccccc);
+    --fg-muted: var(--vscode-descriptionForeground, #9d9d9d);
+    --bg:       var(--vscode-editor-background, #1e1e1e);
+    --bg-alt:   var(--vscode-sideBar-background, #252526);
+    --code-bg:  var(--vscode-textCodeBlock-background, #1f1f1f);
+    --code-fg:  var(--vscode-textPreformat-foreground, #d7ba7d);
+    --border:   var(--vscode-panel-border, #3c3c3c);
+    --link:     var(--vscode-textLink-foreground, #3794ff);
+
+    /* Fallbacks for GitBook's --tint-* / --primary-* / --neutral-* tokens
+       (their original light-mode values are baked into element style="...").
+       Map them to VSCode theme tokens so colours don't look out of place. */
+    --tint-1: var(--vscode-editor-background);
+    --tint-2: var(--vscode-editor-background);
+    --tint-3: var(--vscode-sideBar-background);
+    --tint-4: var(--vscode-input-background);
+    --tint-11: var(--vscode-foreground);
+    --tint-12: var(--vscode-foreground);
+    --primary-1: var(--vscode-editor-background);
+    --primary-9: var(--vscode-textLink-foreground);
+    --primary-11: var(--vscode-textLink-foreground);
+    --neutral-3: var(--vscode-sideBar-background);
+    --neutral-9: var(--vscode-descriptionForeground);
+    --neutral-11: var(--vscode-foreground);
+    --neutral-12: var(--vscode-foreground);
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.55 var(--vscode-font-family, -apple-system, "Segoe UI", Tahoma, sans-serif);
+}
+
+/* Override the GitBook print-page container — strip the simulated paper. */
+[id^="page-"] {
+    max-width: 980px !important;
+    margin: 0 auto !important;
+    padding: 1.5rem 2rem !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    min-height: 0 !important;
+    break-before: auto !important;
+    break-after: auto !important;
+}
+
+/* Add a soft divider between sections. */
+[id^="page-"] + [id^="page-"] {
+    border-top: 1px solid var(--border) !important;
+    margin-top: 2rem !important;
+}
+
+/* Headings. */
+h1 { font-size: 1.85rem; margin: 1.6rem 0 0.9rem; font-weight: 600; color: var(--fg); }
+h2 { font-size: 1.35rem; margin: 1.4rem 0 0.7rem; font-weight: 600; color: var(--fg); }
+h3 { font-size: 1.1rem;  margin: 1.1rem 0 0.5rem; font-weight: 600; color: var(--fg); }
+h4 { font-size: 1.0rem;  margin: 0.9rem 0 0.4rem; font-weight: 600; color: var(--fg-muted); }
+
+/* Tailwind size escape hatches occasionally collide; force our scale. */
+.text-6xl, .text-5xl, .text-4xl { font-size: 1.85rem !important; }
+.text-3xl { font-size: 1.35rem !important; }
+.text-2xl { font-size: 1.1rem !important; }
+
+p { margin: 0.6rem 0; }
+ul, ol { margin: 0.6rem 0; padding-left: 1.4rem; }
+li { margin: 0.2rem 0; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 1.2rem 0; }
+
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Inline code. */
+code {
+    font: 0.92em var(--vscode-editor-font-family, "Cascadia Code", Consolas, monospace);
+    background: var(--code-bg);
+    color: var(--code-fg);
+    padding: 0.05rem 0.32rem;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+
+/* Code blocks: GitBook wraps them in nested divs with shiki spans.
+   We restyle the outermost code-shell that contains <span class="highlight-line">. */
+div:has(> span.highlight-line),
+div:has(> span > span.highlight-line) {
+    background: var(--code-bg);
+    color: var(--code-fg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.8rem 1rem;
+    margin: 0.8rem 0;
+    overflow-x: auto;
+    font: 0.92em/1.5 var(--vscode-editor-font-family, "Cascadia Code", Consolas, monospace);
+    white-space: pre;
+    display: block;
+}
+span.highlight-line {
+    display: block;
+    white-space: pre;
+}
+span.highlight-line-content { white-space: pre; }
+/* Override per-token light-mode colours from inline style attributes. */
+span.highlight-line span,
+span.highlight-line-content span {
+    color: inherit !important;
+}
+
+/* Tables (used for parameter/return-value lists in some sections). */
+table {
+    border-collapse: collapse;
+    margin: 0.8rem 0;
+    width: 100%;
+    font-size: 0.95em;
+}
+th, td {
+    border: 1px solid var(--border);
+    padding: 0.4rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+}
+th { background: var(--bg-alt); font-weight: 600; }
+
+/* Quote / callout boxes. */
+blockquote {
+    border-left: 3px solid var(--link);
+    background: var(--bg-alt);
+    margin: 0.8rem 0;
+    padding: 0.5rem 0.9rem;
+    color: var(--fg-muted);
+}
+
+/* Selection colour matches editor. */
+::selection { background: var(--vscode-editor-selectionBackground, rgba(38, 79, 120, 0.6)); }
+`.trim();
+
+const finalHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline';">
+<title>Perception API — Enma</title>
+<style>
+${css}
+</style>
+</head>
+<body>
+${html.trim()}
+</body>
+</html>
+`;
+
+fs.mkdirSync(OUT_DIR, { recursive: true });
+fs.writeFileSync(OUT, finalHtml, 'utf8');
+
+const outBytes = finalHtml.length;
+console.log(`build-perception-docs: wrote ${OUT}`);
+console.log(`  input:    ${inputBytes.toLocaleString()} bytes`);
+console.log(`  output:   ${outBytes.toLocaleString()} bytes  (${((1 - outBytes / inputBytes) * 100).toFixed(1)}% smaller)`);

@@ -23,7 +23,8 @@
     "onCommand:enma.bundleStripped",
     "onCommand:enma.bundleProject",
     "onCommand:enma.bundleAll",
-    "onCommand:enma.initProject"
+    "onCommand:enma.initProject",
+    "onCommand:enma.openDocs"
   ],
   "keywords": [
     "enma",
@@ -99,6 +100,11 @@
       {
         "command": "enma.initProject",
         "title": "Initialize Enma project (source + tasks.json)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.openDocs",
+        "title": "Open Perception API Docs",
         "category": "Enma"
       }
     ],
@@ -400,9 +406,10 @@
     "copy-predefined": "node scripts/copy-predefined.mjs",
     "regenerate-stdlib": "node tools/regenerate-stdlib.mjs",
     "validate-predefined": "node tools/validate-predefined.mjs",
+    "build-perception-docs": "node scripts/build-perception-docs.mjs",
     "corpus": "node tools/corpus-fuzz.mjs",
     "package": "vsce package",
-    "vscode:prepublish": "tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p client/tsconfig.json && npm run copy-predefined && node scripts/build-prod.mjs"
+    "vscode:prepublish": "tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p client/tsconfig.json && npm run copy-predefined && npm run build-perception-docs && node scripts/build-prod.mjs"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",

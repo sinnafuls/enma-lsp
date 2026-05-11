@@ -14,6 +14,7 @@ import {
 } from 'vscode-languageclient/node';
 
 import { registerBundler } from './bundler';
+import { registerDocsViewer } from './docsViewer';
 
 let client: LanguageClient | undefined;
 
@@ -51,6 +52,9 @@ export function activate(context: ExtensionContext): void {
 
     // Bundler commands + task provider (Ctrl+Alt+B etc).
     registerBundler(context);
+
+    // Perception API docs in-extension webview ("Enma: Open Perception Docs").
+    registerDocsViewer(context);
 
     // §A11 Permissions banner: watch for workspace-scope flips of
     // enma.permissions.ffi or enma.permissions.file.
