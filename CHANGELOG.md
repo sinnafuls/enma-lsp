@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased — Cold-start workspace scan + docs viewer polish
+
+### Cold-start workspace pre-scan (fixes phantom Unknown-type errors)
+
+Opening a project used to show false-positive `Unknown type 'camera_t'` /
+`Unknown type 'player_t'` errors that vanished only once you clicked into
+the file that *declared* the type. Cause: the LSP's workspace pre-scan
+was gated behind `enma.implicitMutualInclusion`, so under the default
+(explicit `#include`) mode the LSP only knew about files you'd opened.
+Cross-file `#include "foo.em"` resolution failed because `foo.em` wasn't
+in the records map yet.
+
+Fix: always pre-scan workspace `.em` files at `setWorkspaceRoot`,
+regardless of `implicitMutualInclusion`. Two-pass analysis already
+existed; just dropped the gate.
+
+Cost: ~one filesystem walk + read of all `.em` files at workspace open.
+For ≤ a few hundred files this is sub-second.
+
+### Docs viewer: strip empty container chains
+
+After the SVG/asset strip in the previous fix, every `<h2>` and `<h3>`
+heading still wrapped its hash-anchor sidekick in
+`<div class="..."><span></span></div>`. Without the SVG inside, this
+left an empty block above every subheading that read as visual
+"indentation" or extra leading whitespace. Strip pipeline now collapses
+empty `<span>`, `<a>`, `<div>`, and `<p>` containers iteratively to a
+fixed point. Bundle shrinks 495 KB → 429 KB.
+
+---
+
 ## Unreleased — Quieter predefined-shadow diagnostic + in-viewer doc links
 
 ### Predefined-shadow diagnostic — Information by default

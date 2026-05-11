@@ -126,6 +126,21 @@ html = html.replace(
 // 6. Strip HTML comments (often <!-- --> placeholders left by the framework).
 html = html.replace(/<!--[\s\S]*?-->/g, '');
 
+// 6a. Strip empty container chains left over from SVG / asset stripping.
+//     GitBook wraps each <h2>/<h3> hash-anchor link in <div class="..."><span></span></div>;
+//     once the SVG icon inside is gone these wrappers are dead weight and
+//     produce an empty line above every subheading. Iterate to a fixed point
+//     because stripping inner empties exposes newly-empty outer containers.
+let _prevHtml;
+do {
+    _prevHtml = html;
+    html = html
+        .replace(/<span\b[^>]*>\s*<\/span>/g, '')
+        .replace(/<a\b[^>]*>\s*<\/a>/g, '')
+        .replace(/<div\b[^>]*>\s*<\/div>/g, '')
+        .replace(/<p\b[^>]*>\s*<\/p>/g, '');
+} while (_prevHtml !== html);
+
 // 6b. Re-highlight code blocks using Enma's keyword set.
 //
 // The source HTML's shiki spans reference GitBook CSS vars that don't ship

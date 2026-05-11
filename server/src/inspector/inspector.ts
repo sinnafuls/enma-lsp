@@ -300,10 +300,12 @@ export class Inspector {
         this._resolver.setWorkspaceRoot(this._workspaceRoot);
         // Scan workspace for .em.predefined files.
         this._loadWorkspacePredefined();
-        // Scan workspace for .em files when implicit mutual inclusion is enabled.
-        if (this._settings.implicitMutualInclusion) {
-            this._loadWorkspaceEmFiles();
-        }
+        // Always pre-scan workspace .em files so cross-file types (e.g. `camera_t`
+        // declared in one file, used in another) resolve immediately at workspace
+        // open. Previously this was gated on implicitMutualInclusion, but even
+        // with explicit #include semantics the LSP needs every referenced file's
+        // records populated for include resolution to succeed at cold start.
+        this._loadWorkspaceEmFiles();
     }
 
 
