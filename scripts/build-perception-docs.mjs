@@ -80,6 +80,16 @@ html = html.replace(/<video\b[^>]*>[\s\S]*?<\/video>/gi, '');
 html = html.replace(/<iframe\b[^>]*>[\s\S]*?<\/iframe>/gi, '');
 html = html.replace(/<iframe\b[^>]*\/?>/gi, '');
 
+// 5b. Drop all inline <svg>...</svg> elements. GitBook embeds 133 of these as
+//     external-link icons, chapter-jump arrows, and copy-code chrome. Without
+//     their original sizing CSS they render at huge default dimensions — see
+//     screenshot regression that triggered this fix.
+html = html.replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, '');
+
+// 5c. Drop GitBook's chrome buttons (copy-code, jump-to-section, theme toggle).
+//     They're useless without their scripts and they steal click events.
+html = html.replace(/<button\b[^>]*>[\s\S]*?<\/button>/gi, '');
+
 // 6. Strip HTML comments (often <!-- --> placeholders left by the framework).
 html = html.replace(/<!--[\s\S]*?-->/g, '');
 
@@ -179,10 +189,10 @@ code {
     border: 1px solid var(--border);
 }
 
-/* Code blocks: GitBook wraps them in nested divs with shiki spans.
-   We restyle the outermost code-shell that contains <span class="highlight-line">. */
-div:has(> span.highlight-line),
-div:has(> span > span.highlight-line) {
+/* Code blocks: GitBook uses <pre> wrapping shiki <span class="highlight-line">.
+   The default <pre> already preserves whitespace; we just theme it and ensure
+   children break onto their own lines. */
+pre {
     background: var(--code-bg);
     color: var(--code-fg);
     border: 1px solid var(--border);
@@ -192,14 +202,25 @@ div:has(> span > span.highlight-line) {
     overflow-x: auto;
     font: 0.92em/1.5 var(--vscode-editor-font-family, "Cascadia Code", Consolas, monospace);
     white-space: pre;
-    display: block;
+}
+pre code {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    display: block;       /* GitBook code wrapper is class="table" — force block */
+    white-space: pre;
 }
 span.highlight-line {
     display: block;
     white-space: pre;
 }
 span.highlight-line-content { white-space: pre; }
-/* Override per-token light-mode colours from inline style attributes. */
+/* Override per-token light-mode colours from inline style attributes —
+   shiki inlines style="color: light-dark(rgb(var(--tint-11)), ...)" on every
+   span, which falls back to unset without GitBook's variable definitions. */
+pre span[style],
 span.highlight-line span,
 span.highlight-line-content span {
     color: inherit !important;
