@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased — Perception docs refresh (MCP API) + reference examples
+
+### Docs viewer now covers the new MCP API section
+
+The bundled Perception docs are refreshed from the latest GitBook export
+(2.26 MB source, up from 921 KB — ~2.5× content growth). New top-level
+section: **MCP API**, documenting Perception's JSON-RPC server that
+exposes the proc API surface to external AI clients (Claude Code, Cline,
+Continue) via Streamable HTTP transport.
+
+The MCP API is **not** an Enma-callable surface — it's a configuration
+panel inside Perception itself plus a per-connection JSON-RPC handle
+model. `perception.em.predefined` therefore needs no signature changes
+for it; the viewer just renders the new section so users writing AI-agent
+integrations can read the tool catalog + permission gating in-extension.
+
+Bundle: 654 KB (was 429 KB; 71 % smaller than the new source).
+
+### New reference scripts in example/
+
+Added two reference projects so users have copy-and-adapt-friendly
+templates for common Perception workflows:
+
+- `example/aim_trainer.em` — single-file 3D aim trainer. Demonstrates
+  sidebar widgets (slider / checkbox / options), per-frame `register_routine`,
+  custom shader + constant buffer plumbing, RNG, vector math, and the
+  full keybind / scoring loop. ~26 KB, runs standalone.
+- `example/pcxcraft/` — multi-file project laid out as
+  `main.em` + `voxlands/{camera,gui,render,state,world}.em`.
+  Demonstrates `#include` chains across feature folders.
+
+Both are reference only — `example/**` is excluded from the VSIX via
+`.vscodeignore`, so they don't ship with the extension.
+
+### Repo cleanup: removed pcx-extended-api/
+
+Deleted the legacy `pcx-extended-api/` docs directory (15 KB of markdown
+mirrors of the GitBook content). The in-extension viewer with the latest
+upstream HTML supersedes it; no runtime code referenced it.
+
+---
+
 ## Unreleased — Cold-start workspace scan + docs viewer polish
 
 ### Cold-start workspace pre-scan (fixes phantom Unknown-type errors)
