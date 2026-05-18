@@ -639,7 +639,10 @@ ws_t ws_connect(string url, int64 timeout_ms);
 // 09 - Render API
 // ============================================================================
 
-// Opaque color value, factory mirrors Enma idiom (free fn with the same name).
+// `color` is now shipped as a source-level module — `import "color";` gives
+// a [[packed]] 4-byte struct with direct field access (`c.r` etc.). The class
+// declaration below covers the legacy typereg fallback used when scripts skip
+// the import; the method-form accessors (`c.r()`) remain valid in both paths.
 class color {
     int64 r();
     int64 g();
@@ -650,6 +653,8 @@ class color {
     int64 y();
     int64 z();
     int64 w();
+    // copy with a different alpha channel (returns a fresh color).
+    color with_alpha(uint8 _a);
 }
 
 color color(int64 r, int64 g, int64 b, int64 a);
