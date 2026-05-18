@@ -2,7 +2,7 @@
 // Input: PreprocessedOutput.preprocessedTokens (post-expansion, conditionals resolved, comments stripped).
 // Output: { ast: NodeScript, diagnostics: Diagnostic[] } with partial AST and Continue-on-error recovery.
 //
-// Grammar source of truth: server/bnf.txt
+// Grammar source of truth: docs/parser-bnf.txt
 // Reference shape ported from angel-lsp parser.ts (recursive-descent harness only;
 // Enma-specific productions rebuilt from scratch).
 //

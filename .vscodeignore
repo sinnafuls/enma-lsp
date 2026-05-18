@@ -1,4 +1,4 @@
-# --- Dev/meta directories (root and nested) ---
+# --- Dev/meta directories ---
 .vscode/**
 .claude/**
 .omc/**
@@ -6,17 +6,18 @@
 .github/**
 .git/**
 .gitignore
+.gitattributes
 
 # --- Large unused subtrees ---
 spike/**
-pcx-extended-api/**
 example/**
 docs/**
 scripts/**
 !scripts/bundler.mjs
 tools/**
+samples/**
 
-# --- Source files (only dist/ ships) ---
+# --- Server sources (only dist/ ships) ---
 server/src/**
 server/test/**
 server/out/**
@@ -26,8 +27,8 @@ server/tsconfig*.json
 server/tsconfig.tsbuildinfo
 server/.eslintrc*
 server/.mocharc*
-server/bnf.txt
 
+# --- Client sources (only dist/ ships) ---
 client/src/**
 client/out/**
 client/node_modules/**
@@ -40,7 +41,7 @@ client/.eslintrc*
 node_modules/**
 package-lock.json
 
-# --- Source maps, TypeScript sources (defense in depth) ---
+# --- Source maps + TypeScript sources (defense in depth) ---
 **/*.map
 **/*.ts
 
@@ -51,25 +52,9 @@ esbuild.config.mjs
 **/.eslintrc*
 **/.mocharc*
 
-# --- Misc repo files ---
-samples/**
-progress.txt
-prd.json
-smoke-test.js
-smoke-providers.js
-test-providers.js
-test-mock-vscode.js
-fake-vscode-marker.js
-ship.bat
-ship.sh
-ship_source.bat
-VSCODE-PLUGIN-WORKSPACE.md
-shipped/**
-ship_source/**
-
-# --- Source HTML for the bundled docs (920 KB) — only the stripped output
-# at client/resources/perception-docs.html ships in the VSIX ---
+# --- Source HTML for the bundled Perception docs (~920 KB).
+# Only the stripped output at client/resources/perception-docs.html ships. ---
 data/perception-docs.source.html
 
-# --- Already-packaged .vsix files ---
+# --- Packaged extension archives ---
 *.vsix

@@ -1,0 +1,18 @@
+# Stop CRLF/LF churn on generated and bundled files.
+# Generated content is written with LF; locking it here keeps Windows clones
+# from re-marking the file as modified on every checkout / regen.
+
+*.em.predefined           text eol=lf
+*.em                      text eol=lf
+*.json                    text eol=lf
+*.mjs                     text eol=lf
+*.ts                      text eol=lf
+*.tsx                     text eol=lf
+
+# Shell scripts and similar must keep LF regardless of OS.
+*.sh                      text eol=lf
+bin/enma-language-server  text eol=lf
+
+# Binary or already-handled assets — leave to git's defaults.
+*.vsix                    binary
+*.pdf                     binary

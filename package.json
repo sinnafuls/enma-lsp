@@ -581,6 +581,8 @@
     "sync-docs": "node scripts/sync-from-docs-mcp.mjs",
     "build-perception-docs": "node scripts/build-perception-docs.mjs",
     "corpus": "node tools/corpus-fuzz.mjs",
+    "baseline": "node tools/baseline-timing.mjs",
+    "profile": "node tools/profile-parse.mjs",
     "package": "vsce package",
     "vscode:prepublish": "tsc --noEmit -p server/tsconfig.json && tsc --noEmit -p client/tsconfig.json && npm run copy-predefined && npm run build-perception-docs && node scripts/build-prod.mjs"
   },

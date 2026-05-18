@@ -46,7 +46,6 @@ prd.json
 .tmp-audit/
 
 # Local working notes (uncomment if you don't want these public)
-# smoke-test.js
 
 # Tree-sitter spike — generated artifacts and large binaries
 spike/tree-sitter-enma/node_modules/
