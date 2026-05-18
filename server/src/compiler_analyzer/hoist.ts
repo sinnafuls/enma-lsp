@@ -81,7 +81,7 @@ export function hoistAfterParsed(ast: NodeScript, globalScope: SymbolGlobalScope
         if (next) next();
     }
 
-    return { globalScope, analyzeQueue };
+    return { globalScope, analyzeQueue, ast };
 }
 
 // ---- Top-level dispatcher ----------------------------------------------

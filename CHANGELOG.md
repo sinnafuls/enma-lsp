@@ -1,5 +1,69 @@
 # Changelog
 
+## Unreleased — Server-side parity sweep against VoidChecksum/enma-lsp-pcx
+
+Adds the language-server features VoidChecksum's fork ships but ours didn't,
+plus an append-only docs sync pipeline that keeps the bundled predefined
+files in lockstep with the upstream Enma + Perception MCP docs without
+clobbering hand-curated declarations.
+
+### LSP capabilities
+
+- **Folding range provider** (`server/src/services/foldingRange.ts`,
+  capability advertised by `server.ts`). Folds `{}` pairs, multi-line block
+  comments, runs of `//` comments, and `#region` / `#endregion` markers.
+- **Workspace symbol provider** (`server/src/services/workspaceSymbol.ts`).
+  `Ctrl+T` cross-workspace symbol search with exact / prefix / substring
+  scoring and namespace-and-class container paths. The capability was
+  claimed in the README but had never been wired into the server's
+  capabilities object — that's now fixed.
+- **Semantic tokens for `[[…]]` annotations** (`semanticTokens.ts`).
+  Brackets plus the annotation identifier are tagged `decorator`; argument
+  literals keep their natural colouring.
+- **`enma-predefined` language id** with grammar + filename + extension
+  registration. The LSP now serves `.em.predefined` files alongside `.em`.
+
+### Standalone server reach
+
+- **`bin/enma-language-server.js`** — Node launcher that auto-injects
+  `--stdio` when no transport flag is given. Lets Claude Code, OpenCode,
+  Copilot CLI, Neovim, Helix, Cursor, Antigravity, Zed and Sublime LSP
+  drive the same server bundle the VSCode extension uses.
+- **`bin` field in `package.json`** so `npm install -g .` exposes the
+  `enma-language-server` binary on the user's PATH.
+
+### Analyzer hardening
+
+- **Const + stack-escape warning pass**
+  (`server/src/compiler_analyzer/escapeAndConstCheck.ts`). Emits
+  `EN_CONST_WRITE` on writes to a `const` local and `EN_STACK_ESCAPE` on
+  `return &local;` / address-of-local stored into a non-local destination.
+  Intra-frame address-of stays silent. Wired into `analyzeAfterHoisted`
+  via a new `ast` field on `HoistResult`.
+- **Multi-project `lspMode: full | syntaxOnly`** via
+  `server/src/core/projectScope.ts`. A single `hasFullLsp(uri)` helper gates
+  every analyzer-aware handler in `server.ts`; files inside a `syntaxOnly`
+  project drop to parser-only diagnostics. Single-project workspaces (no
+  `enma.projects` declared) preserve today's behaviour.
+
+### Docs MCP sync pipeline
+
+- **`npm run sync-docs`** — append-only merge from
+  `data/docs-catalogue.json` into `server/src/predefined/{enma-stdlib,
+  perception}.em.predefined`. Predefined wins: existing declarations are
+  never overwritten, new symbols land under a dated
+  `// ─── Imported via npm run sync-docs <YYYY-MM-DD> ───` header. Workflow
+  documented at `docs/docs-mcp-sync.md`.
+- Pure merge logic in `scripts/lib/predefinedMerge.mjs` (with a sibling
+  `.d.ts`) so CI can verify the merge without the MCP servers reachable.
+
+### Tests
+
+- +44 mocha specs across 7 new server-side test files (folding ranges,
+  workspace symbols, annotation decorators, bin launcher, escape-and-const
+  check, project scope, predefined merge). Total suite stays green.
+
+---
 ## Unreleased — Perception docs refresh (MCP API) + reference examples
 
 ### Docs viewer now covers the new MCP API section

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "comment": "Catalogue of declarations pulled from the docs MCP servers (enma-docs + perception-docs). Refresh workflow lives in docs/docs-mcp-sync.md. The sync script (scripts/sync-from-docs-mcp.mjs) reads this file and append-only-merges new symbols into the bundled predefined files. Start with an empty `symbols` array; each refresh PR appends real entries.",
+  "generatedAt": "2026-05-18T00:00:00.000Z",
+  "sources": [
+    "mcp__enma-docs__searchDocumentation",
+    "mcp__perception-docs__getPage"
+  ],
+  "symbols": []
+}

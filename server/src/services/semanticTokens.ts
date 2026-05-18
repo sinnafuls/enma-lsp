@@ -30,6 +30,7 @@ export const SEMANTIC_TOKEN_TYPES: lsp.SemanticTokenTypes[] = [
     lsp.SemanticTokenTypes.struct,
     lsp.SemanticTokenTypes.interface,
     lsp.SemanticTokenTypes.method,
+    lsp.SemanticTokenTypes.decorator,
 ];
 
 export const SEMANTIC_TOKEN_MODIFIERS: lsp.SemanticTokenModifiers[] = [
@@ -57,6 +58,7 @@ const TYPE_INDEX = {
     struct: 9,
     interface: 10,
     method: 11,
+    decorator: 12,
 };
 
 const MOD_DECLARATION = 1 << 0;
@@ -76,8 +78,50 @@ export function provideSemanticTokens(
     const nameInfo = new Map<string, { type: number; mods: number; declUri: string; declLine: number; declChar: number }>();
     indexSymbols(globalScope, nameInfo);
 
+    // Track [[…]] nesting so we can retag the bracket pair plus any identifier
+    // inside as `decorator`. Argument literals (numbers, strings) keep their
+    // natural classification so colour customisations stay correct.
+    let annotationDepth = 0;
+
     for (const token of rawTokens) {
+        if (token.kind === TokenKind.AnnotationOpen) {
+            annotationDepth++;
+            builder.push(
+                token.location.start.line,
+                token.location.start.character,
+                token.text.length,
+                TYPE_INDEX.decorator,
+                0,
+            );
+            continue;
+        }
+        if (token.kind === TokenKind.AnnotationClose) {
+            builder.push(
+                token.location.start.line,
+                token.location.start.character,
+                token.text.length,
+                TYPE_INDEX.decorator,
+                0,
+            );
+            if (annotationDepth > 0) annotationDepth--;
+            continue;
+        }
+
         if (token.kind !== TokenKind.Identifier) continue;
+
+        // Inside [[…]], identifiers are part of the annotation name — paint
+        // them with the decorator type regardless of any global-scope match.
+        if (annotationDepth > 0) {
+            builder.push(
+                token.location.start.line,
+                token.location.start.character,
+                token.text.length,
+                TYPE_INDEX.decorator,
+                0,
+            );
+            continue;
+        }
+
         const info = nameInfo.get(token.text);
         if (info === undefined) continue;
 

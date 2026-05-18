@@ -16,6 +16,14 @@ import { provideSignatureHelp } from './services/signatureHelp';
 import { provideInlayHint } from './services/inlayHint';
 import { provideCodeAction } from './services/codeAction';
 import { documentOnTypeFormattingProvider } from './services/documentOnTypeFormatting';
+import { provideFoldingRanges } from './services/foldingRange';
+import { provideWorkspaceSymbol } from './services/workspaceSymbol';
+import {
+    hasFullLsp,
+    setResolvedProjects,
+    resolveProjects,
+    ProjectConfig,
+} from './core/projectScope';
 import { formatFile } from './formatter/formatter';
 import { FormatterSettings, defaultFormatterSettings } from './formatter/formatterState';
 import { printSymbolScope } from './compiler_analyzer/symbolUtils';
@@ -78,6 +86,8 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
                 firstTriggerCharacter: ';',
                 moreTriggerCharacter: ['}', '\n'],
             },
+            foldingRangeProvider: true,
+            workspaceSymbolProvider: true,
         },
     };
     return result;
@@ -118,6 +128,7 @@ async function applyEnmaConfiguration(): Promise<void> {
     interface EnmaCfg {
         implicitMutualInclusion?: boolean;
         diagnostics?: { predefinedCollisionSeverity?: 'warning' | 'information' | 'off' };
+        projects?: ProjectConfig[];
     }
     let cfg: EnmaCfg | undefined;
     try {
@@ -145,6 +156,9 @@ async function applyEnmaConfiguration(): Promise<void> {
     if (Object.keys(partial).length > 0) {
         inspector.updateSettings(partial);
     }
+
+    const projects = Array.isArray(cfg.projects) ? cfg.projects : [];
+    setResolvedProjects(resolveProjects(projects, workspaceRoot));
 }
 
 // ---- Helpers -----------------------------------------------------------
@@ -165,12 +179,14 @@ function allReferenceTokens(): ReferenceTokens[] {
 // ---- Capability handlers ----------------------------------------------
 
 connection.onHover(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
     const r = getRecord(textDocument.uri);
     if (r === undefined) return null;
     return provideHover(r.analyzerScope.globalScope, r.rawTokens, position) ?? null;
 });
 
 connection.onCompletion(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
     const tokenComp = provideCompletionOfToken(r.rawTokens, position);
@@ -187,12 +203,14 @@ connection.onCompletionResolve((item) => {
 });
 
 connection.onSignatureHelp(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
     const r = getRecord(textDocument.uri);
     if (r === undefined) return null;
     return provideSignatureHelp(r.analyzerScope.globalScope, r.rawTokens, position) ?? null;
 });
 
 connection.onDefinition(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
     const r = getRecord(textDocument.uri);
     if (r === undefined) return null;
     const defs = provideDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
@@ -201,12 +219,14 @@ connection.onDefinition(({ textDocument, position }) => {
 });
 
 connection.onReferences(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
     return provideReferences(r.analyzerScope.globalScope, r.rawTokens, allReferenceTokens(), position);
 });
 
 connection.onRenameRequest(({ textDocument, position, newName }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
     const r = getRecord(textDocument.uri);
     if (r === undefined) return null;
     const refs = provideReferences(r.analyzerScope.globalScope, r.rawTokens, allReferenceTokens(), position);
@@ -226,6 +246,7 @@ connection.onDocumentSymbol(({ textDocument }) => {
 });
 
 connection.onCodeAction(({ textDocument, range, context }) => {
+    if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
     return provideCodeAction(
@@ -238,12 +259,15 @@ connection.onCodeAction(({ textDocument, range, context }) => {
 connection.onCodeActionResolve((action) => action);
 
 connection.languages.semanticTokens.on(({ textDocument }) => {
+    // Semantic tokens stay on under syntaxOnly so colour highlighting works,
+    // but they degrade gracefully — the analyzer-aware tags simply don't fire.
     const r = getRecord(textDocument.uri);
     if (r === undefined) return { data: [] };
     return provideSemanticTokens(r.analyzerScope.globalScope, r.rawTokens);
 });
 
 connection.languages.inlayHint.on(({ textDocument, range }) => {
+    if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
     return provideInlayHint(
@@ -271,6 +295,17 @@ connection.onDocumentOnTypeFormatting(({ textDocument, position, ch }) => {
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
     return documentOnTypeFormattingProvider(r.rawTokens, r.content, position, ch);
+});
+
+connection.onFoldingRanges(({ textDocument }) => {
+    const r = inspector.getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideFoldingRanges(r.rawTokens);
+});
+
+connection.onWorkspaceSymbol(({ query }) => {
+    const scopes = inspector.getAllRecords().map(r => r.analyzerScope.globalScope);
+    return provideWorkspaceSymbol(query, scopes);
 });
 
 // ---- Custom requests --------------------------------------------------

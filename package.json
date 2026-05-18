@@ -17,8 +17,12 @@
     "Snippets"
   ],
   "main": "./client/dist/extension.js",
+  "bin": {
+    "enma-language-server": "./bin/enma-language-server.js"
+  },
   "activationEvents": [
     "onLanguage:enma",
+    "onLanguage:enma-predefined",
     "onCommand:enma.bundle",
     "onCommand:enma.bundleStripped",
     "onCommand:enma.bundleProject",
@@ -50,6 +54,19 @@
         "configuration": "./language-configuration.json"
       },
       {
+        "id": "enma-predefined",
+        "aliases": [
+          "Enma Predefined"
+        ],
+        "extensions": [
+          ".em.predefined"
+        ],
+        "filenames": [
+          "em.predefined"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
         "id": "enma-binary",
         "aliases": [
           "Enma Binary"
@@ -62,6 +79,11 @@
     "grammars": [
       {
         "language": "enma",
+        "scopeName": "source.enma",
+        "path": "./syntaxes/enma.tmLanguage.json"
+      },
+      {
+        "language": "enma-predefined",
         "scopeName": "source.enma",
         "path": "./syntaxes/enma.tmLanguage.json"
       }
@@ -401,6 +423,15 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Whether to strip comments when bundling this project."
+              },
+              "lspMode": {
+                "type": "string",
+                "enum": [
+                  "full",
+                  "syntaxOnly"
+                ],
+                "default": "full",
+                "description": "LSP scope for files under this project. 'full' (default) enables all IntelliSense services. 'syntaxOnly' disables analyzer-driven services (hover, completion, signature help, go-to-def, references, rename, code actions, inlay hints, analyzer diagnostics) — useful for reference folders that should NOT pollute the workspace symbol table."
               }
             }
           }
@@ -416,6 +447,7 @@
     "copy-predefined": "node scripts/copy-predefined.mjs",
     "regenerate-stdlib": "node tools/regenerate-stdlib.mjs",
     "validate-predefined": "node tools/validate-predefined.mjs",
+    "sync-docs": "node scripts/sync-from-docs-mcp.mjs",
     "build-perception-docs": "node scripts/build-perception-docs.mjs",
     "corpus": "node tools/corpus-fuzz.mjs",
     "package": "vsce package",

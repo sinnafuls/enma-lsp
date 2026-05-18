@@ -44,6 +44,7 @@ import { SymbolType } from './symbolObject';
 import { tryGetBuiltinType } from './builtinType';
 import { findSymbolWithParent } from './symbolUtils';
 import { TextLocation } from '../compiler_tokenizer/textLocation';
+import { runEscapeAndConstCheck } from './escapeAndConstCheck';
 
 // ---- Queue types --------------------------------------------------------
 
@@ -53,6 +54,9 @@ export type AnalyzeQueue = Array<() => void>;
 export interface HoistResult {
     globalScope: SymbolGlobalScope;
     analyzeQueue: AnalyzeQueue;
+    /** AST stashed by hoistAfterParsed so post-passes that need full tree access
+     *  (escape/const check, lint-like rules, etc.) can run without re-parsing. */
+    ast?: NodeScript;
 }
 
 // ---- Public entry -------------------------------------------------------
@@ -68,6 +72,12 @@ export function analyzeAfterHoisted(uri: string, hoistResult: HoistResult): Anal
     while (hoistResult.analyzeQueue.length > 0) {
         const next = hoistResult.analyzeQueue.shift();
         if (next) next();
+    }
+
+    // Post-pass: const-write + stack-escape warnings. Runs after the main
+    // analyze queue so it sees a stable AST. Cheap (single tree walk).
+    if (hoistResult.ast) {
+        runEscapeAndConstCheck(uri, hoistResult.ast);
     }
 
     return new AnalyzerScope(uri, hoistResult.globalScope);
