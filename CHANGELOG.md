@@ -1,5 +1,75 @@
 # Changelog
 
+## Unreleased — Client-side parity sweep against VoidChecksum/enma-lsp-pcx
+
+Wires every VSCode-side feature VoidChecksum's fork ships but ours didn't:
+auto-import code action, engine-MCP client + Run Script, DAP attach,
+template scaffold + CI workflow generator, predefined edit, snapshot diff,
+and three Perception-specific reference webviews.
+
+### Editor commands
+
+- **`Enma: Run Script (MCP)`** — POSTs the active script to a Perception
+  engine MCP server. Settings live under `enma.mcp.{enabled,endpoint,
+  timeoutMs,authToken}`. On-save runs `script/validate` and surfaces
+  engine diagnostics in a dedicated `enma-mcp` collection so LSP
+  diagnostics stay separate.
+- **`Enma: Scaffold From Template…`** + two seed templates
+  (`perception-minimal`, `perception-multi`). Templates are inlined into
+  the bundle — no resource pipeline.
+- **`Enma: Generate CI Workflow`** — writes `.github/workflows/enma.yml`
+  that bundles every project on PR and uploads the bundled output as a
+  workflow artifact.
+- **`Enma: Edit Project em.predefined`** — creates the workspace
+  `em.predefined` with a seed header on first run, then opens it.
+- **`Enma: Diff Current File With Snapshot…`** — picks a snapshot via the
+  native file dialog, opens VSCode's diff view against the active editor.
+- **`Enma: AOB Pattern Explorer`** — webview with a live IDA-style hex
+  pattern decoder (hex / decimal / wildcard breakdown). Strict nonce-CSP.
+- **`Enma: Zydis Playground`** — script-free reference card webview for
+  `import "zydis";`.
+- **`Enma: Unicorn Reference Panel`** — script-free reference card
+  webview for `import "unicorn";`.
+
+### Auto-import code action
+
+`client/src/autoImport.ts` + `autoImportCatalogue.ts`. A QuickFix scans
+the active document for unimported catalogue-known identifiers (vec,
+color, math3d, regex, json, time, thread, atomic, file) and offers an
+`import "<module>";` insertion after the trailing preamble line. Strips
+comments + strings before scanning so doc-comments don't trigger false
+hits.
+
+### Bundler
+
+`enma.bundler.bundleOnSave` — debounced (750ms) auto-rebundle when a
+`.em` file is saved. Picks the first project from `enma.projects` if any,
+else uses the default `enma.bundler.*` settings.
+
+### DAP attach
+
+`client/src/dap.ts` registers a `DebugAdapterDescriptorFactory` that
+proxies attach sessions to a TCP `DebugAdapterServer` (default
+`localhost:27979`, matching the Enma SDK's published default). Adds the
+`enma-lsp-dap` debugger contribution + a `breakpoints` registration +
+the matching `onDebug` / `onDebugResolve:enma-lsp-dap` activation events.
+This ships the attach proxy only — server-side DAP stays deferred per
+the original gate decision.
+
+### Engine MCP client
+
+`client/src/mcpClient.ts` + `mcpRequest.ts` (pure-logic split so payload
+shapes are unit-testable). HTTP/1.1 streamable JSON-RPC; supports
+`tools/call`, `initialize` handshake, optional bearer-token auth, and a
+configurable per-call timeout.
+
+### Tests
+
+- +22 mocha specs across 2 new client test files: `autoImport.test.ts`
+  (catalogue + scanner) and `mcpClient.test.ts` (request shapes + HTTP /
+  JSON-RPC error paths with fetch mocked).
+
+---
 ## Unreleased — Server-side parity sweep against VoidChecksum/enma-lsp-pcx
 
 Adds the language-server features VoidChecksum's fork ships but ours didn't,

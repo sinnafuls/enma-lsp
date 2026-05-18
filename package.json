@@ -28,7 +28,17 @@
     "onCommand:enma.bundleProject",
     "onCommand:enma.bundleAll",
     "onCommand:enma.initProject",
-    "onCommand:enma.openDocs"
+    "onCommand:enma.openDocs",
+    "onCommand:enma.runScript",
+    "onCommand:enma.template.scaffold",
+    "onCommand:enma.template.ci",
+    "onCommand:enma.predefined.edit",
+    "onCommand:enma.snapshot.diff",
+    "onCommand:enma.aob.explore",
+    "onCommand:enma.zydis.playground",
+    "onCommand:enma.unicorn.panel",
+    "onDebug",
+    "onDebugResolve:enma-lsp-dap"
   ],
   "keywords": [
     "enma",
@@ -128,6 +138,46 @@
         "command": "enma.openDocs",
         "title": "Open Perception API Docs",
         "category": "Enma"
+      },
+      {
+        "command": "enma.runScript",
+        "title": "Run Script (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.template.scaffold",
+        "title": "Scaffold From Template…",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.template.ci",
+        "title": "Generate CI Workflow",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.predefined.edit",
+        "title": "Edit Project em.predefined",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.snapshot.diff",
+        "title": "Diff Current File With Snapshot…",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.aob.explore",
+        "title": "AOB Pattern Explorer",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.zydis.playground",
+        "title": "Zydis Playground",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.unicorn.panel",
+        "title": "Unicorn Reference Panel",
+        "category": "Enma"
       }
     ],
     "keybindings": [
@@ -166,6 +216,62 @@
             "description": "Strip line and block comments from the bundled output."
           }
         }
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "enma"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "enma-lsp-dap",
+        "label": "Enma Debugger (DAP)",
+        "languages": [
+          "enma"
+        ],
+        "configurationAttributes": {
+          "attach": {
+            "properties": {
+              "address": {
+                "type": "string",
+                "description": "Host the Enma DAP server is listening on.",
+                "default": "localhost"
+              },
+              "port": {
+                "type": "number",
+                "description": "TCP port the Enma DAP server is listening on.",
+                "default": 27979
+              }
+            },
+            "required": [
+              "address",
+              "port"
+            ]
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "enma-lsp-dap",
+            "request": "attach",
+            "name": "Attach to Enma DAP server",
+            "address": "localhost",
+            "port": 27979
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Enma Debug: Attach (localhost:27979)",
+            "description": "Attach to a running Enma DAP server",
+            "body": {
+              "type": "enma-lsp-dap",
+              "request": "attach",
+              "name": "Attach to Enma DAP server",
+              "address": "localhost",
+              "port": 27979
+            }
+          }
+        ]
       }
     ],
     "configurationDefaults": {
@@ -394,6 +500,31 @@
           "type": "boolean",
           "default": true,
           "description": "Strip line and block comments from the bundled output."
+        },
+        "enma.bundler.bundleOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Re-run the bundler ~750ms after any .em save. Debounced — multiple rapid saves collapse into a single bundler invocation. Uses `enma.bundler.*` settings when `enma.projects` is empty, or the first entry in `enma.projects` otherwise."
+        },
+        "enma.mcp.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Talk to a Perception engine MCP server (https://docs.perception.cx/perception/enma/mcp-api). Required for engine-side validation (on-save script/validate) and `Enma: Run Script (MCP)`."
+        },
+        "enma.mcp.endpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:9077/mcp",
+          "description": "URL of the engine MCP server. HTTP/1.1 streamable JSON-RPC."
+        },
+        "enma.mcp.timeoutMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "Per-call timeout (in milliseconds) for MCP requests. Increase when validating large bundled scripts."
+        },
+        "enma.mcp.authToken": {
+          "type": "string",
+          "default": "",
+          "description": "Optional bearer token sent as `Authorization: Bearer …` on every MCP request."
         },
         "enma.projects": {
           "type": "array",

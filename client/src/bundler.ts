@@ -112,6 +112,16 @@ function readBundlerSettings(): { src: string; out: string; strip: boolean } {
     };
 }
 
+function readBundleOnSave(): boolean {
+    const cfg = workspace.getConfiguration('enma.bundler');
+    return cfg.get<boolean>('bundleOnSave', false);
+}
+
+// Debounce window for bundleOnSave. Long enough that a rapid burst of
+// `Ctrl+S` saves across multiple files (e.g. format-on-save in batches) only
+// triggers a single bundler run.
+const BUNDLE_ON_SAVE_DEBOUNCE_MS = 750;
+
 // --------------------------------------------------------------------------
 // Commands
 // --------------------------------------------------------------------------
@@ -256,6 +266,31 @@ class EnmaBundleTaskProvider implements TaskProvider {
 // Activation entry
 // --------------------------------------------------------------------------
 
+async function bundleDefaultTarget(context: ExtensionContext): Promise<void> {
+    const projects = readProjects();
+    if (projects.length > 0) {
+        const p = projects[0];
+        const src = resolveAgainstRoot(p.sourceDirectory);
+        const out = resolveAgainstRoot(p.outputFile);
+        if (!src || !out) return;
+        await runBundler(context, src, out, !!p.stripComments);
+        return;
+    }
+    await cmdBundle(context);
+}
+
+let s_bundleDebounce: NodeJS.Timeout | undefined;
+
+function scheduleBundleOnSave(context: ExtensionContext): void {
+    if (s_bundleDebounce) clearTimeout(s_bundleDebounce);
+    s_bundleDebounce = setTimeout(() => {
+        s_bundleDebounce = undefined;
+        bundleDefaultTarget(context).catch(err => {
+            window.showErrorMessage(`Enma bundleOnSave failed: ${(err as Error).message}`);
+        });
+    }, BUNDLE_ON_SAVE_DEBOUNCE_MS);
+}
+
 export function registerBundler(context: ExtensionContext): void {
     context.subscriptions.push(
         commands.registerCommand('enma.bundle', () => cmdBundle(context)),
@@ -264,5 +299,10 @@ export function registerBundler(context: ExtensionContext): void {
         commands.registerCommand('enma.bundleAll', () => cmdBundleAll(context)),
         commands.registerCommand('enma.initProject', () => cmdInitProject()),
         tasks.registerTaskProvider('enma-bundle', new EnmaBundleTaskProvider(context)),
+        workspace.onDidSaveTextDocument(doc => {
+            if (!readBundleOnSave()) return;
+            if (doc.languageId !== 'enma') return;
+            scheduleBundleOnSave(context);
+        }),
     );
 }

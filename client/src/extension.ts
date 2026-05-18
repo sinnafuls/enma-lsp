@@ -15,6 +15,14 @@ import {
 
 import { registerBundler } from './bundler';
 import { registerDocsViewer } from './docsViewer';
+import { registerAutoImport } from './autoImport';
+import { registerEngineMcp } from './runScript';
+import { registerDap } from './dap';
+import { registerTemplateScaffold } from './templateScaffold';
+import { registerPredefinedAndSnapshot } from './predefinedAndSnapshot';
+import { registerAobExplorer } from './aobExplorer';
+import { registerZydisPlayground } from './zydisPlayground';
+import { registerUnicornPanel } from './unicornPanel';
 
 let client: LanguageClient | undefined;
 
@@ -35,9 +43,10 @@ export function activate(context: ExtensionContext): void {
     const clientOptions: LanguageClientOptions = {
         documentSelector: [
             {scheme: 'file', language: 'enma'},
+            {scheme: 'file', language: 'enma-predefined'},
         ],
         synchronize: {
-            fileEvents: workspace.createFileSystemWatcher('**/*.em'),
+            fileEvents: workspace.createFileSystemWatcher('**/*.{em,em.predefined}'),
         },
     };
 
@@ -55,6 +64,26 @@ export function activate(context: ExtensionContext): void {
 
     // Perception API docs in-extension webview ("Enma: Open Perception Docs").
     registerDocsViewer(context);
+
+    // QuickFix: insert missing `import "<module>";` for catalogue-known names.
+    registerAutoImport(context);
+
+    // Engine MCP: `Enma: Run Script` + on-save engine validation.
+    registerEngineMcp(context);
+
+    // DAP attach: forward `attach` debug sessions to the Perception engine.
+    registerDap(context);
+
+    // Templates: scaffold seed projects + emit a Bundle CI workflow.
+    registerTemplateScaffold(context);
+
+    // Predefined editor + snapshot diff helpers.
+    registerPredefinedAndSnapshot(context);
+
+    // Perception-specific reference webviews.
+    registerAobExplorer(context);
+    registerZydisPlayground(context);
+    registerUnicornPanel(context);
 
     // §A11 Permissions banner: watch for workspace-scope flips of
     // enma.permissions.ffi or enma.permissions.file.
