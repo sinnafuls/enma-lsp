@@ -24,14 +24,6 @@ Full LSP support for [Enma](https://enma-1.gitbook.io/enma) — the JIT-compiled
 
 ## Install
 
-### VSCode Marketplace
-
-Search for **Enma Language** by `deadlock` in the Extensions panel, or:
-
-```
-ext install deadlock.enma-language
-```
-
 ### Install from VSIX
 
 1. Download `enma-language-1.0.0.vsix` from the [releases page](https://github.com/deadlock/enma-lsp/releases).
