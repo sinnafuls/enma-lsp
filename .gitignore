@@ -31,13 +31,21 @@ Thumbs.db
 # AI tooling state — never publish
 .omc/
 .claude/
+.cursor/
+.cursorrules
+.aider*
+.continue/
+.gemini/
+.codeium/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+prd.json
 
 # Scratch directory used during cross-repo audits (e.g. fork comparisons).
 .tmp-audit/
 
 # Local working notes (uncomment if you don't want these public)
-# progress.txt
-# prd.json
 # smoke-test.js
 
 # Tree-sitter spike — generated artifacts and large binaries
