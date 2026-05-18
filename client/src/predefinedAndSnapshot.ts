@@ -1,4 +1,4 @@
-// Two small editor productivity commands matching VoidChecksum's parity set:
+// Two small editor productivity commands:
 //
 //   enma.predefined.edit  — open (creating if necessary) the workspace
 //                            em.predefined file. Seeded with a header comment

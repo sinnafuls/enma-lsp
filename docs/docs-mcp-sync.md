@@ -1,10 +1,10 @@
-# Docs MCP Sync
+# Docs MCP sync
 
 The bundled `.em.predefined` files are the source of truth for IntelliSense.
-We sync new declarations from upstream Enma + Perception documentation via two
-MCP servers — `enma-docs` and `perception-docs` — but the predefined files
-themselves are **append-only**: existing declarations are never overwritten,
-only added to.
+New declarations are pulled from the upstream Enma + Perception documentation
+via two MCP servers — `enma-docs` and `perception-docs` — but the predefined
+files themselves are **append-only**: existing declarations are never
+overwritten, only added to.
 
 ## Catalogue format
 
@@ -35,12 +35,12 @@ directly so CI can verify the merge without an MCP server reachable.
 
 ## Refresh workflow
 
-1. **Run the docs MCPs in your dev session.** In Claude Code or another MCP-
-   aware host with `mcp__enma-docs__*` and `mcp__perception-docs__*` tools
-   available, ask for the symbols you want to import. Typical prompts:
-   - "List every type declared under `perception::proc` in the docs."
-   - "Give me the signature of every function under `proc_api.md`."
-   - "Pull the full Enma stdlib `vec` addon."
+1. **Pull symbols from the docs MCP servers.** In any MCP-aware host with
+   the `enma-docs` and `perception-docs` servers configured, query the
+   sections you want to import. Typical queries:
+   - All types declared under `perception::proc`.
+   - Every signature in a given `*_api.md` page.
+   - The full surface of an Enma stdlib addon (e.g. `vec`).
 2. **Convert to the catalogue shape.** For each symbol, emit a `{module, name,
    kind, declaration, source}` object and add it to `data/docs-catalogue.json`.
    Keep the JSON sorted by module then name to keep the diff readable.

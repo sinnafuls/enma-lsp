@@ -21,9 +21,9 @@ section pointing at the new standalone setup page.
   a pointer at `docs/standalone-lsp.md` and a one-line quick-start.
 
 ---
-## Unreleased — Client-side parity sweep against VoidChecksum/enma-lsp-pcx
+## Unreleased — Client-side feature pass
 
-Wires every VSCode-side feature VoidChecksum's fork ships but ours didn't:
+Adds the VS Code-side features that complete the Perception authoring loop:
 auto-import code action, engine-MCP client + Run Script, DAP attach,
 template scaffold + CI workflow generator, predefined edit, snapshot diff,
 and three Perception-specific reference webviews.
@@ -91,9 +91,9 @@ configurable per-call timeout.
   JSON-RPC error paths with fetch mocked).
 
 ---
-## Unreleased — Server-side parity sweep against VoidChecksum/enma-lsp-pcx
+## Unreleased — Server-side feature pass
 
-Adds the language-server features VoidChecksum's fork ships but ours didn't,
+Adds the language-server features that round out the IntelliSense surface,
 plus an append-only docs sync pipeline that keeps the bundled predefined
 files in lockstep with the upstream Enma + Perception MCP docs without
 clobbering hand-curated declarations.

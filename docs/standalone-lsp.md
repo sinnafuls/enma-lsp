@@ -1,9 +1,9 @@
-# Standalone Enma Language Server
+# Standalone Enma language server
 
-The Enma language server is a stock stdio LSP. The VS Code extension drives it
-over Node IPC, but the same server bundle works in any LSP-capable editor or
-AI agent. The launcher at `bin/enma-language-server.js` auto-injects `--stdio`
-when no transport flag is passed.
+The Enma language server is a stdio LSP. The VS Code extension drives it
+over Node IPC; the same server bundle works in any LSP-capable editor.
+The launcher at `bin/enma-language-server.js` auto-injects `--stdio` when
+no transport flag is passed.
 
 ## Prerequisites
 
@@ -16,14 +16,14 @@ npm install
 npm run compile
 ```
 
-After that, point your editor at `bin/enma-language-server.js`. If you'd like
-a stable absolute path that everything can share, set the `ENMA_LSP_PATH`
-environment variable to the launcher and reference `$ENMA_LSP_PATH` (or
-`%ENMA_LSP_PATH%` on Windows) below.
+Then point your editor at `bin/enma-language-server.js`. To share a stable
+absolute path between configs, set the `ENMA_LSP_PATH` environment variable
+to the launcher and reference `$ENMA_LSP_PATH` (or `%ENMA_LSP_PATH%` on
+Windows) in every snippet below.
 
 The bundled `perception.em.predefined` ships inside the server, so
-IntelliSense for every Perception API works out of the box — no extra
-`.em.predefined` required.
+IntelliSense for the Perception host API works without any additional
+`.em.predefined` file.
 
 ---
 ## Claude Code
