@@ -10,7 +10,7 @@ when no transport flag is passed.
 Clone and build once:
 
 ```sh
-git clone https://github.com/sin/enma-lsp.git
+git clone https://github.com/sinnafuls/enma-lsp.git
 cd enma-lsp
 npm install
 npm run compile
@@ -73,21 +73,52 @@ Copilot CLI hosts the server alongside Copilot Chat; both surfaces see the
 same IntelliSense data.
 
 ---
-## Neovim (nvim-lspconfig / vim.lsp.start)
+## Neovim
+
+The Enma server is not on the Mason registry yet — register it manually. Three
+setup paths below, pick whichever matches your config. All three share the
+same filetype detection, so add this once at the top of your `init.lua`:
 
 ```lua
-vim.filetype.add({ extension = { em = 'enma' } })
-
-vim.lsp.start({
-  name = 'enma',
-  cmd  = { 'node', vim.fn.expand('$ENMA_LSP_PATH') },
-  root_dir = vim.fs.dirname(
-    vim.fs.find({ '.git', 'em.predefined' }, { upward = true })[1]
-  ),
+-- Detect .em as the "enma" filetype, and .em.predefined as "enma-predefined"
+-- (same grammar, declaration-only — useful if you want to disable bundling
+-- for predefined files separately).
+vim.filetype.add({
+  extension = { em = 'enma' },
+  pattern   = {
+    ['.*%.em%.predefined'] = 'enma-predefined',
+    ['em%.predefined']     = 'enma-predefined',
+  },
 })
 ```
 
-If you prefer `nvim-lspconfig`, register a custom server:
+### Path 1 — built-in `vim.lsp.start` (no plugin)
+
+Neovim 0.11+ ships everything you need. Drop this into your `init.lua` or an
+`ftplugin/enma.lua`:
+
+```lua
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = { 'enma', 'enma-predefined' },
+  callback = function(args)
+    vim.lsp.start({
+      name    = 'enma',
+      cmd     = { 'node', vim.fn.expand('$ENMA_LSP_PATH') },
+      root_dir = vim.fs.dirname(
+        vim.fs.find({ 'em.predefined', '.git', '.vscode' }, {
+          upward = true,
+          path   = vim.api.nvim_buf_get_name(args.buf),
+        })[1]
+      ),
+      -- Tell the server which language id this buffer is so the right
+      -- predefined precedence kicks in.
+      init_options = {},
+    })
+  end,
+})
+```
+
+### Path 2 — `nvim-lspconfig`
 
 ```lua
 local lspconfig = require('lspconfig')
@@ -96,14 +127,108 @@ local configs   = require('lspconfig.configs')
 if not configs.enma then
   configs.enma = {
     default_config = {
-      cmd      = { 'node', vim.fn.expand('$ENMA_LSP_PATH') },
-      filetypes = { 'enma' },
-      root_dir = lspconfig.util.root_pattern('em.predefined', '.git'),
+      cmd       = { 'node', vim.fn.expand('$ENMA_LSP_PATH') },
+      filetypes = { 'enma', 'enma-predefined' },
+      root_dir  = lspconfig.util.root_pattern('em.predefined', '.git', '.vscode'),
+      single_file_support = true,
+      settings  = {
+        -- All `enma.*` settings from the VS Code extension work here too;
+        -- they're forwarded as workspace configuration to the server.
+        enma = {
+          formatter = { enabled = true },
+          parser    = { strict  = false },
+        },
+      },
     },
   }
 end
-lspconfig.enma.setup({})
+
+lspconfig.enma.setup({
+  on_attach = function(client, bufnr)
+    local opts = { buffer = bufnr, silent = true }
+    vim.keymap.set('n', 'gd',    vim.lsp.buf.definition,      opts)
+    vim.keymap.set('n', 'gr',    vim.lsp.buf.references,      opts)
+    vim.keymap.set('n', 'K',     vim.lsp.buf.hover,           opts)
+    vim.keymap.set('n', '<C-k>', vim.lsp.buf.signature_help,  opts)
+    vim.keymap.set('n', '<F2>',  vim.lsp.buf.rename,          opts)
+    vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, opts)
+    vim.keymap.set('n', '<leader>f',  function()
+      vim.lsp.buf.format({ async = true })
+    end, opts)
+  end,
+})
 ```
+
+### Path 3 — lazy.nvim spec (one-liner inside a plugin manager)
+
+```lua
+{
+  'neovim/nvim-lspconfig',
+  ft = { 'enma', 'enma-predefined' },
+  config = function()
+    -- (paste the Path 2 block here)
+  end,
+}
+```
+
+### Completion engine integration
+
+The server advertises completion with `triggerCharacters = ['.', '::', '(', ',']`
+and supports snippets in completion items. Wire up `nvim-cmp` or `blink.cmp`
+so it surfaces stdlib factories and method completions:
+
+```lua
+-- nvim-cmp
+local capabilities = require('cmp_nvim_lsp').default_capabilities()
+lspconfig.enma.setup({ capabilities = capabilities, on_attach = on_attach })
+
+-- blink.cmp (Neovim 0.10+)
+local capabilities = require('blink.cmp').get_lsp_capabilities()
+lspconfig.enma.setup({ capabilities = capabilities, on_attach = on_attach })
+```
+
+### Snippets
+
+The extension ships ~70 snippets under `snippets/`. To use them in Neovim with
+LuaSnip + `friendly-snippets`-style loading:
+
+```lua
+require('luasnip.loaders.from_vscode').lazy_load({
+  paths = { vim.fn.expand('$ENMA_LSP_PATH:h:h') .. '/snippets' },
+})
+```
+
+The snippet JSON files are `enma.code-snippets` (language patterns) and
+`stdlib.code-snippets` (math / vec / list / regex / json / time / atomic / …).
+
+### Treesitter (optional)
+
+There's no Treesitter parser on the registry yet. A grammar spike lives at
+`spike/tree-sitter-enma/` in the repo, retained as a v2.0 candidate — see
+`docs/parser-decision.md`. Until then, the TextMate grammar provided by the
+language server's semantic-token output covers highlighting for any
+LSP-aware client.
+
+### Bundling from Neovim
+
+The bundler is a plain Node script — no editor coupling. Drop a user command
+that runs it for the current buffer's project root:
+
+```lua
+vim.api.nvim_create_user_command('EnmaBundle', function(opts)
+  local root = vim.fs.dirname(vim.fs.find({ 'em.predefined', '.git' }, {
+    upward = true,
+  })[1]) or vim.fn.getcwd()
+  local entry = opts.fargs[1] or (root .. '/source/main.em')
+  local out   = opts.fargs[2] or (root .. '/output/bundled.em')
+  local cmd   = ('node %s/../scripts/bundler.mjs %q %q'):format(
+    vim.fn.expand('$ENMA_LSP_PATH:h'), entry, out
+  )
+  vim.notify(vim.fn.system(cmd))
+end, { nargs = '*' })
+```
+
+Then `:EnmaBundle` from any `.em` buffer.
 
 ---
 ## Helix (`languages.toml`)
@@ -179,6 +304,63 @@ Pair with a `.sublime-syntax` mapping `*.em` → `source.enma` if you don't
 already have one.
 
 ---
+## Emacs
+
+### `eglot` (Emacs 29+)
+
+```elisp
+(require 'eglot)
+
+(add-to-list 'auto-mode-alist '("\\.em\\'" . enma-mode))
+(define-derived-mode enma-mode prog-mode "Enma"
+  "Major mode for Enma source files."
+  (setq-local comment-start "//")
+  (setq-local comment-end ""))
+
+(add-to-list 'eglot-server-programs
+             '(enma-mode . ("node" "/abs/path/to/enma-lsp/bin/enma-language-server.js")))
+
+(add-hook 'enma-mode-hook 'eglot-ensure)
+```
+
+### `lsp-mode`
+
+```elisp
+(require 'lsp-mode)
+
+(add-to-list 'lsp-language-id-configuration '(enma-mode . "enma"))
+
+(lsp-register-client
+ (make-lsp-client
+  :new-connection (lsp-stdio-connection
+                   '("node" "/abs/path/to/enma-lsp/bin/enma-language-server.js"))
+  :major-modes '(enma-mode)
+  :server-id 'enma))
+
+(add-hook 'enma-mode-hook #'lsp)
+```
+
+---
+## JetBrains IDEs (IntelliJ, CLion, Rider, PyCharm, WebStorm…)
+
+JetBrains IDEs support generic stdio LSPs via the **LSP4IJ** plugin
+(`Settings → Plugins → Marketplace → "LSP4IJ"`).
+
+1. Install LSP4IJ.
+2. `Settings → Languages & Frameworks → Language Servers → +`.
+3. Configure:
+   - **Name**: `Enma`
+   - **Command**: `node /abs/path/to/enma-lsp/bin/enma-language-server.js`
+   - **Mappings → File name patterns**: `*.em`, `*.em.predefined`, `em.predefined`
+   - **Mappings → Language ID**: `enma`
+4. Apply, then open any `.em` file — completion, hover, diagnostics, go-to-def
+   light up.
+
+Syntax highlighting needs a textmate bundle; LSP4IJ doesn't import the VSIX
+directly. A workable approximation: select C/C++ syntax for `.em` and let
+semantic tokens (delivered by the server) overlay the right colors.
+
+---
 ## Verifying the install
 
 Once the editor reports `enma-language-server` is running:
@@ -197,4 +379,4 @@ ensures the predefined files are resolved relative to the bundle.
 
 `Help → Toggle Developer Tools` (in any VSCode-based host) or the LSP log of
 your editor will show stderr from the server. Copy that block into an issue
-at [enma-lsp/issues](https://github.com/sin/enma-lsp/issues) and we'll look.
+at [enma-lsp/issues](https://github.com/sinnafuls/enma-lsp/issues) and we'll look.
