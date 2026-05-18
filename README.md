@@ -114,17 +114,13 @@ Script-free webviews shipped inside the extension — no internet required:
 
 ### VS Code & VS Code forks
 
-The marketplace listing is in flight. For now grab the latest VSIX from [Releases](https://github.com/sinnafuls/enma-lsp/releases):
+The marketplace listing is in flight. For now grab the latest `enma-language-<version>.vsix` from [Releases](https://github.com/sinnafuls/enma-lsp/releases), then install it via the UI (`Extensions` → `…` → `Install from VSIX…`) or from the terminal:
 
 ```sh
-code --install-extension enma-language-1.1.17.vsix
-# Cursor:
-cursor --install-extension enma-language-1.1.17.vsix
-# Antigravity:
-antigravity --install-extension enma-language-1.1.17.vsix
+code         --install-extension enma-language-<version>.vsix   # VS Code / VSCodium
+cursor       --install-extension enma-language-<version>.vsix   # Cursor
+antigravity  --install-extension enma-language-<version>.vsix   # Antigravity
 ```
-
-Or from the UI: `Extensions` → `…` menu → `Install from VSIX…`.
 
 ### Other editors & AI agents
 
