@@ -1,8 +1,42 @@
 # DAP Gate Decision
 
-**Date:** 2026-05-06
-**Status:** DEMOTED to v1.1
+**Date:** 2026-05-06 (original), 2026-05-18 (revision)
+**Status:** **ATTACH SHIPPED in v1.1+** — server-side DAP adapter still deferred
 **Plan reference:** §Phase 9, R4, Pre-mortem 3 (enma-lsp-fullstack.md)
+
+## 2026-05-18 update
+
+Following the parity sweep against VoidChecksum/enma-lsp-pcx, the **attach
+flow** has shipped. The extension now contributes:
+
+- A `debuggers` entry of type `enma-lsp-dap` (attach-only).
+- A `breakpoints` registration for the Enma language.
+- `client/src/dap.ts` — a `DebugAdapterDescriptorFactory` that maps the user's
+  attach configuration onto a TCP `DebugAdapterServer` at the configured
+  address/port (default `localhost:27979`, matching the Enma SDK's published
+  default).
+
+This does **not** retract the original demotion: we still have no LSP-side DAP
+server, no breakpoint manager, no source map, no variable enumerator. What we
+have is a thin TCP proxy that lets users attach to any DAP-speaking Enma host
+they happen to be running. If nothing is listening, VSCode surfaces the
+ECONNREFUSED in the Debug Console — no false sense of support.
+
+Files now created (intentionally, by US-008):
+
+- `client/src/dap.ts`
+
+Files still NOT created (intentionally skipped, server side):
+
+- `server/src/dap/dapServer.ts`
+- `server/src/dap/breakpointManager.ts`
+- `server/src/dap/sourceMap.ts`
+- `server/src/dap/variableEnumerator.ts`
+- `server/src/dap/stackTrace.ts`
+- `tests/fixtures/dap/` (any fixture files)
+
+---
+## Original decision (2026-05-06)
 
 ## Decision
 

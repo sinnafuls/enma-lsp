@@ -1,143 +1,196 @@
 {
-  "title": "Enma LSP v1.0 — Phases 4 through 10 (solo ralph completion)",
-  "description": "Finish the Enma Language Server build started by the team-orchestration phase. Phases 0-3 are on disk and green; this PRD covers analyzer completion through v1.0.0 distribution. Plan: D:/Projects/enma-lsp/.omc/plans/enma-lsp-fullstack.md (canonical specification). Non-paraphrasable specs §A1-§A13 must be implemented exactly.",
+  "task": "Achieve and exceed parity with VoidChecksum/enma-lsp-pcx. Source comparison documented in this conversation; Tier A already shipped before ralph started. This PRD covers Tier B/C/D plus our own differentiators. Source-of-truth rule for predefined sync: append-only — predefined wins, never overwrite existing decls.",
   "stories": [
     {
       "id": "US-001",
-      "title": "Phase 4 — Wire all 11 Enma-specific analyzer subsystems",
-      "description": "Complete the analyzer's Enma-specific files. Most exist as scaffolding from the team session (analyzer.ts 7kB skeleton, hoist.ts 22kB, autoResolution.ts present). Need to flesh out: mro.ts (§A3 C3 linearization), pointerRules.ts (AC-7), permissionGate.ts (AC-9), annotationCheck.ts (with [[shadow]]), intrinsics.ts, matchStatement.ts (exhaustiveness), deferStatement.ts, templateInstantiation.ts (4-component cache key with mro-fingerprint), fStringExpr.ts (consume §A2 boundary tokens). All subsystems unit-tested.",
+      "title": "Tier A regression net — verifier proof Tier A still works",
+      "description": "Tier A shipped folding ranges, workspace symbols, [[…]] semantic tokens, enma-predefined language id + grammar, and bin/enma-language-server.js launcher. Add mocha tests so the work doesn't regress.",
+      "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "server/src/compiler_analyzer/mro.ts exists and exports a C3-linearization function for SymbolType.baseList; diamond-equal-rank methods raise an ambiguous-method-resolution diagnostic",
-        "server/src/compiler_analyzer/pointerRules.ts exists; emits 'use \\'.\\' for value access' on `->` over non-pointer and 'use \\'->\\' for pointer access' on `.` over pointer; uses errorForce() so it stays Error under R21 rollback",
-        "server/src/compiler_analyzer/permissionGate.ts exists; [[dll(...)]] emits diagnostic when enma.permissions.ffi=false; uses errorForce() so it stays Error under R21",
-        "server/src/compiler_analyzer/annotationCheck.ts exists; registers known annotations including [[shadow]]; type-checks args (e.g. [[align(N)]] requires int; [[dll(\\\"name\\\")]] requires string literal); annotation-arg type errors use errorForce()",
-        "server/src/compiler_analyzer/intrinsics.ts exists; types __va_count (no parens), __va_arg(i), __asm_rdtsc(), __asm_pause(), __asm_mfence(), __asm_nop()",
-        "server/src/compiler_analyzer/matchStatement.ts exists; warns when non-_ match doesn't cover all enum values",
-        "server/src/compiler_analyzer/deferStatement.ts exists; flags use of out-of-scope locals in defer body",
-        "server/src/compiler_analyzer/templateInstantiation.ts exists; cache key tuple is (template-symbol, type-args, instantiating-scope-uri, mro-fingerprint) — verifiable via grep 'mro-fingerprint' in the file",
-        "server/src/compiler_analyzer/fStringExpr.ts exists; analyzes NodeExprFString.parts; resolves converter overloads on expression parts",
-        "Each subsystem has a corresponding test file under server/test/unit/analyzer/<subsystem>.test.ts with at least 3 test cases each",
-        "TypeScript compile clean (npx tsc --noEmit -p server/tsconfig.json) — 0 errors",
-        "Test suite passes (npx mocha at server/) with no regressions"
+        "server/test/unit/services/foldingRange.test.ts exists; covers brace pairs, block comments, line-comment runs, and #region/#endregion markers; ≥4 cases passing",
+        "server/test/unit/services/workspaceSymbol.test.ts exists; covers exact / prefix / substring scoring and an empty-query baseline; ≥3 cases passing",
+        "server/test/unit/services/semanticTokens.annotations.test.ts exists; verifies a `[[packed]] struct` and a `[[dll(\"name\")]] void f();` emit decorator tokens for the brackets + identifier inside; ≥2 cases passing",
+        "bin/enma-language-server.js exists, has the auto-stdio fallback, exits non-zero with a useful message when server/dist/server.js is absent",
+        "package.json has bin.enma-language-server pointing at bin/enma-language-server.js",
+        "Full server test suite passes (npm test in server/) with no regressions"
       ]
     },
     {
       "id": "US-002",
-      "title": "Phase 4 closure — Tighten showcase.em to ≤30 hoist-time errors + wire R21 rollback exemption list",
-      "description": "Close out Phase 4 by reducing showcase.em hoist-time errors from ~150 to ≤30 (the wk3 decay target per the analyzer's documented decay path: ≤100 wk2 → ≤30 wk3 → ≤5 wk4 → 0 wk5). Wire R21 severity-rollback so AC-7/9/18/[[align/dll]] stay Error regardless of the flag.",
+      "title": "Auto-import code action (vec / color / math3d helpers)",
+      "description": "Client-side CodeActionProvider that scans the active .em file for names that live in pre-shipped addons and offers a QuickFix to insert the matching `import \"…\";` after the preamble. Skip already-imported modules. Strip comments and string literals before scanning so doc-comments don't trigger false hits.",
+      "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "samples/showcase.em produces ≤30 hoist-time errors when run through tokenize → preprocess → parse → hoist (no inspector wrapping yet — that's US-003)",
-        "Setting enma.analyzer.severity flag exists; analyzerDiagnostic.error() respects it; analyzerDiagnostic.errorForce() bypasses it",
-        "Test r21-rollback.test.ts under server/test/unit/analyzer/ verifies: with severity=warning, AC-7 pointer-rule + AC-9 permission-gate + AC-18 MRO-ambiguity + [[align/dll]] arg-type STAY Error; other diagnostics demote to Warning",
-        "Test suite passes with no regressions"
+        "client/src/autoImport.ts exists and exports a CodeActionProvider implementation",
+        "Module catalogue includes at minimum: vec (vec2/3/4 + scalar helpers), color (color, color_*), math3d (mat4/quat constructors), and is sourced from a single mapping table so additions are trivial",
+        "Provider emits a QuickFix code action when an unimported identifier is used; action inserts `import \"<module>\";` immediately after the trailing preamble line",
+        "Already-imported modules produce no QuickFix",
+        "Line comments, block comments, and double-quoted strings are stripped before identifier scanning (no false hits)",
+        "client/src/extension.ts registers the provider in activate()",
+        "Build clean (npm run compile) and lint clean (npm run lint)"
       ]
     },
     {
       "id": "US-003",
-      "title": "Phase 5 — Inspector + analysis queue + §A8 memory budget",
-      "description": "Build server/src/inspector/{inspector.ts, analysisResolver.ts, analysisQueue.ts}. Composes the pipeline tokenize → preprocess → parse → hoist → analyze per URI. Delayed-task queue with priority levels. §A4 cycle detection at workspace level (consumes preprocessor's includePathTokens). §A8 per-record memory budget <5MB/kLoC + LRU enma.indexCache.maxClosedFiles=300.",
+      "title": "Const + stack-escape warning pass",
+      "description": "Server-side post-pass that walks every NodeFunction body and emits warnings for (a) assignments to const variables, (b) `return &local;` / address-of-local stored into a non-local destination. Mirrors patterns documented at https://enma-1.gitbook.io/enma/language-guide/advanced.",
+      "priority": 1,
       "passes": true,
       "acceptanceCriteria": [
-        "server/src/inspector/inspector.ts exists; exports InspectRecord {content, uri, diagnosticsInParser, diagnosticsInAnalyzer, rawTokens, preprocessedOutput, ast, isAnalyzerPending, analyzerScope}; exports inspectFile(uri, content)",
-        "server/src/inspector/analysisResolver.ts exists; delayed-task queue with priority levels (open file = high, dependent = medium, background = low); exports request(record), flush(uri?)",
-        "server/src/inspector/analysisQueue.ts exists; FIFO with priority bands",
-        "Setting enma.indexCache.maxClosedFiles defaults to 300; LRU evicts analyzerScope on closed-file records when count exceeds cap; tokens+AST retained",
-        "Inspector wrapping resolves #include workspace-wide; samples/showcase.em now produces 0 hoist-time errors when fed through inspector.inspectFile (full pipeline)",
-        "Test inspector.test.ts: open A imports B, edit B, A re-analyzes; close A, re-edit B, A still indexed",
-        "Test memory-budget.test.ts: 50-file fixture stress test, per-record <5MB/kLoC after GC",
-        "Test suite passes with no regressions"
+        "server/src/compiler_analyzer/escapeAndConstCheck.ts exists; exports a single entry function called from analyzer.ts after the main analyzer pass",
+        "Const assignment: `const int32 x = 1; x = 2;` emits a Warning with code 'EN_CONST_WRITE' or equivalent",
+        "Stack-escape return: `int32 f() { int32 x = 1; return &x; }` emits a Warning with code 'EN_STACK_ESCAPE'",
+        "Stack-escape store to global: `int32* g; void f() { int32 x = 1; g = &x; }` emits the same warning",
+        "Local-to-local address-of inside the same function does NOT warn (no false positive)",
+        "Warnings use a new analyzerDiagnostic.warning() (or equivalent) helper so the existing severity rollback doesn't escalate/demote them silently",
+        "server/test/unit/analyzer/escapeAndConstCheck.test.ts exists with ≥5 cases — at least one positive case per rule and one negative case",
+        "TypeScript clean: tsc --noEmit -p server/tsconfig.json — 0 errors",
+        "Full server test suite passes"
       ]
     },
     {
       "id": "US-004",
-      "title": "Phase 6 — Predefined + Tools (§A9, §A10, §A11)",
-      "description": "Replace tools/regenerate-stdlib.mjs and tools/validate-predefined.mjs stubs with real implementations. Generate server/src/predefined/enma-stdlib.em.predefined from data/enma-stdlib.json (819 entries). §A10 precedence: workspace > forceInclude > bundled. AC-21 collision warning. AC-21b [[shadow]] suppression. §A11 permissions hardening banner in client.",
+      "title": "enma.bundler.bundleOnSave — debounced auto-rebundle",
+      "description": "When enma.bundler.bundleOnSave is true, the extension re-runs the active project's bundler ~750ms after any .em save. Debounced; uses the default bundler settings or the first project in enma.projects.",
+      "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "tools/regenerate-stdlib.mjs reads data/enma-stdlib.json and emits server/src/predefined/enma-stdlib.em.predefined with declarations matching the 819 JSON entries",
-        "tools/validate-predefined.mjs runs the generator and pipes the output through tokenizer + preprocessor + parser; exits 1 on any diagnostic; exits 0 on clean parse",
-        ".github/workflows/predefined-validate.yml runs validate-predefined.mjs on PR (file exists with the workflow definition)",
-        "Inspector loads bundled enma-stdlib.em.predefined at startup unless ENMA_LSP_TEST=1; loads workspace .em.predefined files if present; precedence is workspace > forceInclude > bundled",
-        "Collision detection: workspace .em.predefined redeclaring a stdlib symbol emits a Warning naming origin='bundled' (AC-21); same redeclaration with [[shadow]] annotation suppresses the warning (AC-21b)",
-        "client/src/extension.ts emits a workspaceTrust banner when workspace settings.json flips enma.permissions.ffi or enma.permissions.file to true; treats setting as false until user clicks Trust",
-        "Test predefined.test.ts (AC-16, AC-21), predefined.shadow.test.ts (AC-21b), predefined.collision.test.ts (AC-21)",
-        "Full test suite passes; predefined-validate CI passes"
+        "package.json contributes.configuration adds `enma.bundler.bundleOnSave` (boolean, default false) with a clear description mentioning the debounce window",
+        "client/src/bundler.ts (or a sibling module) listens to workspace.onDidSaveTextDocument for .em files and schedules a debounced rebundle when bundleOnSave is true",
+        "Multiple saves within the debounce window collapse to a single bundler invocation (verified by manual trace logging in implementation, not test)",
+        "Bundler errors surface via window.showErrorMessage; success is silent unless the user has previously opened the output panel",
+        "Build + lint clean"
       ]
     },
     {
       "id": "US-005",
-      "title": "Phase 7 — Services (v1.0-core SHIP GATE) — PASSED",
-      "description": "Implement all 14 LSP service providers in server/src/services/. Wire to server.ts onInitialize. This is the v1.0-core ship gate — when this story passes, .vsix builds and v1.0.0 is releaseable. DELETE client/legacy/extension.js.",
+      "title": "Multi-project lspMode (full | syntaxOnly)",
+      "description": "Per-project LSP scope control inside one workspace. `full` enables all IntelliSense; `syntaxOnly` provides only grammar highlighting + parser errors. Useful for reference folders that shouldn't pollute the workspace analyzer.",
+      "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "server/src/services/{hover,completion,completionExtension,completionResolve,definition,definitionExtension,reference,documentSymbol,semanticTokens,signatureHelp,inlayHint,codeAction,documentOnTypeFormatting,utils}.ts all exist",
-        "server.ts onInitialize registers all 14 providers; custom requests enma/printGlobalScope and enma/indexProgress wired",
-        "AC-1 hover: every keyword + every entry in data/enma-stdlib.json produces a hover with correct signature",
-        "AC-3 member-access completion: typing 'foo.' after 'MyClass foo;' shows ONLY MyClass's members",
-        "AC-4 namespace-access completion: 'MyNamespace::' shows that namespace's members + class statics + enum values",
-        "AC-5 rename: a 3-file fixture rename updates all references",
-        "AC-7 pointer rule diagnostics fire correctly",
-        "AC-8 semantic tokens distinguish global/local var, namespace, class, enum, function with global/declaration modifiers",
-        "AC-10 unknown type 'flojat64' emits Error with quickfix 'Did you mean float64?' (Levenshtein ≤2)",
-        "AC-17 find-references on stdlib 'println' finds calls inside f-string interpolations",
-        "AC-18 rename through inheritance traverses MRO; diamond-conflicting names emit ambiguous diagnostic",
-        "client/legacy/extension.js DELETED",
-        "npm run compile produces client/dist/extension.js + server/dist/server.js cleanly",
-        "Full test suite passes (target ≥800 tests)",
-        "TypeScript clean: tsc --noEmit -p server/tsconfig.json — 0 errors",
-        "samples/showcase.em produces 0 errors end-to-end through inspector"
+        "enma.projects[].lspMode added to package.json schema (enum: full | syntaxOnly, default full)",
+        "Server-side: a single helper hasFullLsp(uri) lives in inspector or a new core/projectScope module; every onHover/onCompletion/onSignatureHelp/onDefinition/onReferences/onRename/onCodeAction/inlayHint handler early-returns when hasFullLsp returns false",
+        "Diagnostics in syntaxOnly mode are limited to tokenizer + parser diagnostics (no analyzer diagnostics for files outside `full` projects)",
+        "server/test/unit/inspector/lspMode.test.ts covers: file inside `full` project sees full LSP, file inside `syntaxOnly` project gets empty results from hover/completion/definition, file outside all projects defaults to full (preserves single-project behaviour)",
+        "Full server test suite passes; lint + tsc clean"
       ]
     },
     {
       "id": "US-006",
-      "title": "Phase 8 — Formatter (v1.0-extended; SHIPS) — PASSED",
-      "description": "Build server/src/formatter/{formatter,formatterState,formatterDetail}.ts. AST-driven, uses original tokens to preserve comments + f-string verbatim. AC-11 idempotency: format(format(x)) === format(x) on showcase + 100 fuzz inputs. F-string tokens (TokenFStringText + tokens between TokenFStringExprOpen/Close) flagged isVerbatim — formatter NEVER mutates inside.",
+      "title": "Docs MCP sync tool — append-only predefined merge",
+      "description": "scripts/sync-from-docs-mcp.mjs that pulls from the enma-docs and perception-docs MCP servers and merges new declarations into server/src/predefined/{enma-stdlib,perception}.em.predefined. Never overwrites or deletes existing decls (predefined wins); appends new symbols under a dated section header just like VoidChecksum's import-docs.ts. Has a --write flag; default is dry-run.",
+      "priority": 2,
       "passes": true,
       "acceptanceCriteria": [
-        "server/src/formatter/formatter.ts exists; formatFile(content, rawTokens, ast): TextEdit[]",
-        "server/src/formatter/formatterState.ts + formatterDetail.ts exist",
-        "Settings: enma.formatter.indentSpaces (4), useTabIndent (false), maxBlankLines (1), bracePosition (sameLine|nextLine, default sameLine), spaceAfterComma (true), spaceAroundBinaryOp (true), alignDesignatedInit (false), fStringPreserveVerbatim (true), enabled (true) — all defined in package.json contributes.configuration",
-        "AC-11 idempotency holds on showcase.em + 100 fuzz inputs (test idempotency.test.ts)",
-        "30 byte-exact f-string preservation tests pass (test fstring-verbatim.test.ts)",
-        "If AC-11 / fstring-verbatim fail at story-end: ship enma.formatter.enabled=false default and document the gate failure in CHANGELOG.md as a v1.0.1 graduation criterion (HONEST gate handling, not silent skip)"
+        "scripts/sync-from-docs-mcp.mjs exists; runnable via `npm run sync-docs` after adding to package.json scripts",
+        "Reads a docs catalogue JSON at data/docs-catalogue.json (or environment-provided path) so the script itself stays MCP-agnostic and offline-runnable in CI",
+        "For each incoming declaration: identifier extracted via the same regex pattern shape as VoidChecksum's import-docs.ts (class/struct/interface, funcdef, function, global var)",
+        "Existing identifiers are skipped (not overwritten); new identifiers are appended under a `// ─── Imported via npm run sync-docs <YYYY-MM-DD> ───` header",
+        "Default mode prints a human-readable diff; `--write` flag mutates the predefined files in place",
+        "scripts/sync-from-docs-mcp.test.mjs (or a sibling mocha spec) exercises the merge function against a fixture catalogue + fixture predefined; verifies append-only semantics",
+        "Documentation: docs/docs-mcp-sync.md (or a section in README) explains the workflow, including how to refresh data/docs-catalogue.json from the MCP servers in the dev environment"
       ]
     },
     {
       "id": "US-007",
-      "title": "Phase 9 — DAP (DEMOTED to v1.1 per gate) — PASSED",
-      "description": "DAP is GREENFIELD — angel-lsp has no DAP source. Phase 9 entry HARD-GATES on Enma SDK maintainer commitment to expose the wire protocol. Without commitment, demote to v1.1 in CHANGELOG.md and SKIP the phase entirely. With commitment, build dap/* + protocol doc + fixture host.",
+      "title": "Engine MCP client + Run Script command",
+      "description": "Talk to a Perception engine-side MCP server at http://127.0.0.1:9077/mcp (default; configurable). Adds an enma.runScript command that POSTs the active .em (bundled if applicable) to the engine via the MCP `script/execute` tool. Engine validation is exposed via `script/validate` as a diagnostic provider.",
+      "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "Gate decision recorded in docs/dap-gate-decision.md: either (a) upstream commitment confirmed and Phase 9 proceeds, or (b) no commitment and Phase 9 demoted to v1.1 with explicit CHANGELOG.md note",
-        "If gated COMMIT path: server/src/dap/{dapServer,breakpointManager,sourceMap,variableEnumerator,stackTrace}.ts all exist; tests/fixtures/dap/host.js fixture host exists; AC-12 e2e test passes",
-        "If gated DEMOTE path: CHANGELOG.md has explicit 'DAP debugger demoted to v1.1' entry with rationale; package.json contributes does NOT include the enma-dap debugger; story passes via demotion (this is a legitimate honest outcome per the plan)",
-        "§A12 if COMMIT path: dap/breakpointManager.test.ts, sourceMap.test.ts, variableEnumerator.test.ts, stackTrace.test.ts all exist with at least 3 tests each"
+        "package.json adds settings: enma.mcp.enabled (boolean, default false), enma.mcp.endpoint (string, default http://127.0.0.1:9077/mcp), enma.mcp.timeoutMs (number, default 5000), enma.mcp.authToken (string, default empty — optional bearer)",
+        "package.json contributes command enma.runScript with title 'Run Script (MCP)' under the Enma category",
+        "client/src/mcpClient.ts implements an HTTP/1.1 streamable JSON-RPC client speaking the MCP protocol; gracefully handles connection refused with a single window.showErrorMessage (no toast spam)",
+        "client/src/runScript.ts hooks the command: bundles the active project (or uses the open file in single-file mode), POSTs to script/execute, surfaces stdout/stderr in an Output channel",
+        "engine-MCP validation: when enma.mcp.enabled, on save the client calls script/validate and translates the response into a separate Diagnostic collection (so it doesn't clobber LSP diagnostics)",
+        "Build + lint clean; mcpClient gets at least one unit test that mocks fetch and verifies request payload shape"
       ]
     },
     {
       "id": "US-008",
-      "title": "Phase 10 — Distribution + v1.0.0 release — PASSED",
-      "description": "Final assembly. vsce package produces enma-language-1.0.0.vsix. README updated with Neovim/Helix/Zed setup snippets. CHANGELOG.md updated with v1.0.0 entry. Standalone CLI distribution prep (npm publish package.json shape).",
+      "title": "DAP debugger attach (localhost:27979)",
+      "description": "Wire up the debuggers contribution and an attach flow at localhost:27979 by default. Reverses the v1.1 demotion when an upstream DAP server is reachable; falls back to a clear error message when nothing is listening.",
+      "priority": 3,
       "passes": true,
       "acceptanceCriteria": [
-        "package.json version bumped to 1.0.0",
-        "vsce package succeeds; enma-language-1.0.0.vsix exists at repo root (or skipped with reason if vsce not installed locally — document in CHANGELOG.md)",
-        "README.md contains usage sections for VSCode + Neovim (nvim-lspconfig snippet) + Helix (languages.toml snippet) + Zed (extension.toml snippet)",
-        "CHANGELOG.md has v1.0.0 entry summarizing v1.0-core scope, v1.0-extended outcomes (formatter ship status, DAP gate outcome from US-007), and v1.0.1/v1.1 deferred work",
-        "Standalone CLI: server has a 'bin' entry usable as 'npx enma-lsp --stdio' (standalone-CLI smoke not required for v1.0.0 if untestable in environment; documented in CHANGELOG.md)"
+        "package.json contributes.debuggers includes type 'enma-lsp-dap' (or 'enma-dap'), languages ['enma'], label 'Enma Debugger (DAP)', attach-only configurationAttributes (address, port), initialConfigurations + configurationSnippets pointing at localhost:27979",
+        "package.json contributes.breakpoints includes language: 'enma'",
+        "package.json activationEvents includes onDebug + onDebugResolve:enma-lsp-dap",
+        "client/src/dap.ts registers a DebugAdapterDescriptorFactory that proxies the attach to a TCP socket at the resolved address/port",
+        "Falling back to an attach when nothing is listening produces a single readable error in the Debug Console, not a stack trace",
+        "docs/dap-gate-decision.md updated (or superseded) with a v1.1+ note that DAP attach has shipped"
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Template scaffold + CI generator commands",
+      "description": "Two commands: enma.template.scaffold prompts for a template name and copies a starter project into the workspace; enma.template.ci generates a .github/workflows/enma.yml that builds + bundles every project on PR.",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "client/src/templateScaffold.ts implements both commands; templates live under client/resources/templates/<name>/ as a directory tree",
+        "package.json registers enma.template.scaffold and enma.template.ci with friendly titles under the Enma category",
+        "At least two seed templates ship: 'perception-minimal' (single-file main.em with register_routine + draw_text) and 'perception-multi' (source/main.em + source/lib/*.em demonstrating #include chains)",
+        "CI command writes .github/workflows/enma.yml that runs `node scripts/bundler.mjs` for every project in enma.projects + uploads the bundled output as a workflow artifact",
+        "Build + lint clean"
+      ]
+    },
+    {
+      "id": "US-010",
+      "title": "Predefined edit command + snapshot diff",
+      "description": "enma.predefined.edit opens (creating if absent) the workspace em.predefined file. enma.snapshot.diff prompts for a snapshot file and shows a vscode.diff against the active document.",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "package.json registers enma.predefined.edit and enma.snapshot.diff",
+        "client/src/predefinedEdit.ts: creates em.predefined at the workspace root with a header comment if missing; opens it for editing",
+        "client/src/snapshotDiff.ts: showInputBox (or showOpenDialog) for the snapshot path; invokes vscode.diff against the active editor; gracefully reports missing files",
+        "Build + lint clean"
+      ]
+    },
+    {
+      "id": "US-011",
+      "title": "AOB explorer, Zydis playground, Unicorn panel (Perception-specific webviews)",
+      "description": "Three webview-backed commands matching VoidChecksum's command parity. Each is a thin local webview with a hand-curated reference card sourced from the bundled docs.",
+      "priority": 3,
+      "passes": true,
+      "acceptanceCriteria": [
+        "client/src/aobExplorer.ts: enma.aob.explore opens a webview that lets the user paste an IDA-style pattern and renders the byte interpretation; CSP scripts disabled, inline form only",
+        "client/src/zydisPlayground.ts: enma.zydis.playground opens a webview with a reference card of common zydis_req_t / zydis_builder_t fields and example snippets pulled from the bundled docs",
+        "client/src/unicornPanel.ts: enma.unicorn.panel opens a webview with cpu_t setup recipe + memory mapping cheatsheet",
+        "All three commands registered in package.json contributes.commands",
+        "Build + lint clean"
+      ]
+    },
+    {
+      "id": "US-012",
+      "title": "Editor / agent setup documentation — beat their reach",
+      "description": "Add a README section + a docs/standalone-lsp.md page that walks through the standalone launcher setup for Claude Code, OpenCode, Copilot CLI, Neovim, Helix, Cursor, Antigravity, Zed, and Sublime LSP. We have the bin already; tell the world how to use it.",
+      "priority": 2,
+      "passes": true,
+      "acceptanceCriteria": [
+        "README.md gains a 'Use in other editors & AI agents' section linking to docs/standalone-lsp.md",
+        "docs/standalone-lsp.md exists with ready-to-paste snippets for ≥7 of: Claude Code, OpenCode, Copilot CLI, Neovim (nvim-lspconfig + vim.lsp.start), Helix, Cursor, Antigravity, Zed, Sublime LSP",
+        "Snippets reference `node <abs-path>/bin/enma-language-server.js` and document the env var ENMA_LSP_PATH so users can override",
+        "README + docs page both regenerate cleanly (no broken markdown)"
+      ]
+    },
+    {
+      "id": "US-013",
+      "title": "Final verification — full repo health",
+      "description": "Capstone story. All earlier stories pass. Run lint + tsc + tests + verify the VSIX packages cleanly.",
+      "priority": 4,
+      "passes": true,
+      "acceptanceCriteria": [
+        "npm run lint exits 0",
+        "npx tsc --noEmit -p server/tsconfig.json exits 0; same for client/tsconfig.json",
+        "Full server test suite passes; total test count ≥ pre-ralph count (936)",
+        "npm run compile produces both client/dist/extension.js and server/dist/server.js cleanly with no errors",
+        "CHANGELOG.md gets a single 'Unreleased — VoidChecksum parity sweep' entry summarising Tier A/B/C/D outcomes (with explicit notes on any partially-shipped item)"
       ]
     }
-  ],
-  "metadata": {
-    "plan": "D:/Projects/enma-lsp/.omc/plans/enma-lsp-fullstack.md",
-    "phasesComplete": "0,1,2,3 (scaffolding, tokenizer, preprocessor, parser)",
-    "phaseInProgress": "4 (analyzer; week 1-2 of 5)",
-    "phasesRemaining": "4 (closure), 5, 6, 7, 8, 9, 10",
-    "v1CoreShipGate": "End of Phase 7 (US-005); ACs 1,2,3,4,5,6,7,8,9,10,13,14,15,16,17,18,19,20,21,21b,23,24,25",
-    "ac22Status": "Already proven by parser at 0.84ms median (35x under 30ms target); v1.0.1 graduation criterion at full-pipeline integration",
-    "specs": "§A1-§A13 non-paraphrasable; verify by name-grep before declaring done",
-    "verifierFloor": "STANDARD tier (architect-medium / Sonnet) per ralph minimum"
-  }
+  ]
 }

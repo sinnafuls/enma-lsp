@@ -97,43 +97,29 @@ The extension ships a recursive `#include` resolver that flattens an Enma projec
 node scripts/bundler.mjs <srcEntry.em> <out.em> [--strip]
 ```
 
-## Multi-editor setup
+## Use in other editors & AI agents
 
-The language server ships as a standalone npm package (`enma-lsp`). Install it globally:
+The language server is a stock stdio LSP — it's not tied to VS Code. The same
+engine that powers this extension can drive any LSP-capable editor or AI
+coding agent. The launcher at `bin/enma-language-server.js` auto-injects
+`--stdio` when no transport flag is supplied.
 
-```
-npm install -g enma-lsp
-```
+Full setup snippets for **Claude Code**, **OpenCode**, **Copilot CLI**,
+**Neovim**, **Helix**, **Cursor**, **Antigravity**, **Zed**, and **Sublime
+LSP** live in [`docs/standalone-lsp.md`](docs/standalone-lsp.md).
 
-Then configure your editor:
+Quick start (any editor):
 
-### Neovim (nvim-lspconfig)
-
-```lua
-require'lspconfig'.enma.setup{
-  cmd = {"npx", "enma-lsp", "--stdio"},
-  filetypes = {"enma"},
-}
-```
-
-### Helix (languages.toml)
-
-```toml
-[[language]]
-name = "enma"
-file-types = ["em"]
-language-server = { command = "npx", args = ["enma-lsp", "--stdio"] }
+```sh
+git clone https://github.com/sin/enma-lsp.git
+cd enma-lsp
+npm install && npm run compile
+export ENMA_LSP_PATH="$PWD/bin/enma-language-server.js"
 ```
 
-### Zed (settings.json)
-
-```toml
-[language_servers.enma]
-command = "npx"
-args = ["enma-lsp", "--stdio"]
-```
-
-> Until `enma-lsp` is published to npm, use `node path/to/server/dist/server.js --stdio` or a local `npm link` from the `server/` directory.
+Then point your editor at `node $ENMA_LSP_PATH`. The bundled
+`perception.em.predefined` ships inside the server — IntelliSense, hover docs,
+and diagnostics for the full Perception API work out of the box.
 
 ## Settings reference
 

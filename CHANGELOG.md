@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — Docs + standalone-LSP setup guide
+
+Docs follow-up for the parity sweep: a setup guide for hosting the language
+server outside VSCode, an append-only docs-MCP sync workflow doc, an update
+to the DAP gate decision recording the attach-proxy ship, and a README
+section pointing at the new standalone setup page.
+
+### Files
+
+- `docs/standalone-lsp.md` — copy-pasteable launcher snippets for Claude
+  Code, OpenCode, Copilot CLI, Neovim, Helix, Cursor, Antigravity, Zed,
+  and Sublime LSP, plus a "Verifying the install" checklist.
+- `docs/docs-mcp-sync.md` — workflow for refreshing `data/docs-catalogue
+  .json` from the enma-docs + perception-docs MCP servers and merging
+  declarations into the bundled predefined files via `npm run sync-docs`.
+- `docs/dap-gate-decision.md` — 2026-05-18 update: the attach proxy
+  shipped in v1.1+. Server-side DAP stays deferred per the original gate.
+- `README.md` — the legacy "Multi-editor setup" section is replaced with
+  a pointer at `docs/standalone-lsp.md` and a one-line quick-start.
+
+---
 ## Unreleased — Client-side parity sweep against VoidChecksum/enma-lsp-pcx
 
 Wires every VSCode-side feature VoidChecksum's fork ships but ours didn't:

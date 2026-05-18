@@ -111,3 +111,82 @@ Week 1-2 fused delivery from prior worker-analyzer:
 - F-string byte-exact: 30/30 cases pass
 - Ship gate decision: enma.formatter.enabled = true (SHIP) — both AC-11 and f-string preservation pass
 - Resolved ambiguities: indent stack simplified to always-apply (original same-line dedup from angel-lsp caused non-idempotent first pass); blank-line detection uses lastProcessedLine rather than cursor position (cursor walks through blank lines before finding next token); rawTokens passed to formatFile is the tokenize() output (not preprocessedTokens) to preserve f-string boundary tokens
+
+# =========================================================================
+# Ralph session — VoidChecksum parity sweep (2026-05-18)
+# =========================================================================
+# Goal: meet then exceed VoidChecksum/enma-lsp-pcx feature set.
+# Source-of-truth rule for predefined sync: append-only (predefined wins).
+#
+# Pre-ralph baseline (before this session started):
+# - Tier A already shipped: folding ranges + workspace symbols (services
+#   + capabilities), [[…]] semantic tokens, enma-predefined language id +
+#   grammar, bin/enma-language-server.js standalone launcher with auto-
+#   stdio fallback.
+# - npm run lint: clean.
+# - npm run compile: clean (client 781 KB, server 717 KB).
+# - npm test (server): 936 passing, 2 pending.
+#
+# Iteration 1 — starting US-001 (Tier A regression net).
+#
+# All 13 stories now passing. Iteration log below.
+#
+# US-001 PASSED — 19 new tests across foldingRange.test.ts (6),
+#                 workspaceSymbol.test.ts (6), semanticTokens.annotations.test.ts (3),
+#                 binLauncher.test.ts (4). Tests: 936 → 955.
+#
+# US-002 PASSED — client/src/autoImport.ts + autoImportCatalogue.ts. 12 new
+#                 mocha specs verifying catalogue + scanner. Hooked into
+#                 extension.ts. Tests: 955 → 967.
+#
+# US-003 PASSED — server/src/compiler_analyzer/escapeAndConstCheck.ts. Post-pass
+#                 from analyzeAfterHoisted; emits EN_CONST_WRITE + EN_STACK_ESCAPE.
+#                 Plumbed `ast` field on HoistResult. 7 new tests. Tests: 967 → 974.
+#
+# US-004 PASSED — bundleOnSave (750ms debounce) wired in client/src/bundler.ts +
+#                 enma.bundler.bundleOnSave setting in package.json.
+#
+# US-005 PASSED — server/src/core/projectScope.ts + per-handler hasFullLsp gates
+#                 in server.ts + lspMode added to enma.projects[] schema. 11
+#                 mocha specs cover resolver + URI matching. Tests: 974 → 985.
+#
+# US-006 PASSED — scripts/sync-from-docs-mcp.mjs + scripts/lib/predefinedMerge.mjs
+#                 (with sibling .d.ts) + data/docs-catalogue.json stub +
+#                 docs/docs-mcp-sync.md workflow doc + `npm run sync-docs` script.
+#                 8 mocha specs. Append-only merge verified. Tests: 985 → 993.
+#
+# US-007 PASSED — client/src/mcpClient.ts + mcpRequest.ts + runScript.ts +
+#                 enma.mcp.{enabled,endpoint,timeoutMs,authToken} settings +
+#                 enma.runScript command. 10 mocha specs mocking fetch. Wired into
+#                 extension.ts. Tests: 993 → 1003.
+#
+# US-008 PASSED — client/src/dap.ts + DebugAdapterServer-based attach factory +
+#                 debuggers/breakpoints contribution in package.json. Default
+#                 endpoint localhost:27979. dap-gate-decision.md updated to note
+#                 partial ship (attach proxy only; server-side DAP still deferred).
+#
+# US-009 PASSED — client/src/templateScaffold.ts with two inline seed templates
+#                 (perception-minimal, perception-multi) + enma.template.scaffold
+#                 + enma.template.ci commands.
+#
+# US-010 PASSED — client/src/predefinedAndSnapshot.ts with enma.predefined.edit
+#                 and enma.snapshot.diff commands.
+#
+# US-011 PASSED — client/src/aobExplorer.ts (nonce-CSP webview with live byte
+#                 decoder) + zydisPlayground.ts + unicornPanel.ts (script-free
+#                 reference webviews). All three commands + activation events
+#                 wired.
+#
+# US-012 PASSED — docs/standalone-lsp.md with snippets for 9 hosts (Claude Code,
+#                 OpenCode, Copilot CLI, Neovim, Helix, Cursor, Antigravity, Zed,
+#                 Sublime LSP). README's Multi-editor setup section replaced.
+#
+# US-013 PASSED — final verification:
+#                   - npm run lint: clean
+#                   - npx tsc --noEmit -p server/tsconfig.json: clean
+#                   - npx tsc --noEmit -p client/tsconfig.json: clean
+#                   - npm test: 1003 passing, 2 pending, 0 failing
+#                   - npm run compile: clean (client/dist 818kb, server/dist 726kb)
+#                 CHANGELOG.md entry "Unreleased — VoidChecksum parity sweep"
+#                 written with per-story breakdown.
+
