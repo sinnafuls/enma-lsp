@@ -32,6 +32,9 @@ Thumbs.db
 .omc/
 .claude/
 
+# Scratch directory used during cross-repo audits (e.g. fork comparisons).
+.tmp-audit/
+
 # Local working notes (uncomment if you don't want these public)
 # progress.txt
 # prd.json
