@@ -5,8 +5,6 @@
 (preprocessor
   "#" @punctuation.special
   directive: (identifier) @keyword.directive)
-(preprocessor
-  arg: (_)? @string)
 
 ; ── Strings ─────────────────────────────────────────────
 (string) @string
