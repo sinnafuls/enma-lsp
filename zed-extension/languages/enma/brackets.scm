@@ -1,3 +1,6 @@
-"(" ")" @pair
-"[" "]" @pair
-"{" "}" @pair
+"(" @open
+")" @close
+"[" @open
+"]" @close
+"{" @open
+"}" @close

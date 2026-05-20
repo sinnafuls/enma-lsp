@@ -13,7 +13,7 @@ path = "tree-sitter-enma"
 #   git rev-parse HEAD
 # and paste the full SHA below as the rev value.
 # rev = "<COMMIT_SHA>"
-rev="98db4c1e1186ad6330dfb46c5c8033c30ad715d9"
+rev="502947280e7f68c48dc0871a6a1a5f9fc334a471"
 
 [language_servers.enma-lsp]
 name = "Enma LSP"

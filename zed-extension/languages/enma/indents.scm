@@ -1,2 +1,2 @@
 (block) @indent
-"}" @dedent
+"}" @outdent
