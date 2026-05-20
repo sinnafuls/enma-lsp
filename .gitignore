@@ -56,11 +56,14 @@ spike/tree-sitter-enma/parser.obj
 spike/tree-sitter-enma/scanner.obj
 spike/tree-sitter-enma/build/
 
-# Tree-sitter grammar — generated artifacts
+# Tree-sitter grammar — generated artifacts (keep src/parser.c — Zed needs it)
 tree-sitter-enma/node_modules/
-tree-sitter-enma/src/
 tree-sitter-enma/build/
 tree-sitter-enma/*.wasm
+tree-sitter-enma/parser.exp
+tree-sitter-enma/parser.lib
+tree-sitter-enma/parser.obj
+tree-sitter-enma/scanner.obj
 
 # Zed extension — Rust/Cargo build artifacts
 zed-extension/target/
