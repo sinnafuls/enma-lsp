@@ -3,16 +3,17 @@ name = "Enma"
 version = "0.1.0"
 schema_version = 1
 description = "Enma scripting language support — syntax highlighting, completion, hover, diagnostics, and full LSP services."
-repository = "https://github.com/sin/enma-lsp"
+repository = "https://github.com/sinnafuls/enma-lsp"
 authors = ["sin"]
 
 [grammars.enma]
-repository = "https://github.com/sin/enma-lsp"
-subdir = "tree-sitter-enma"
+repository = "https://github.com/sinnafuls/enma-lsp"
+path = "tree-sitter-enma"
 # After committing the tree-sitter-enma files, run:
 #   git rev-parse HEAD
 # and paste the full SHA below as the rev value.
 # rev = "<COMMIT_SHA>"
+rev="6ffbbf119c3c14e2a02a861b82b2708dc98275e1"
 
 [language_servers.enma-lsp]
 name = "Enma LSP"
