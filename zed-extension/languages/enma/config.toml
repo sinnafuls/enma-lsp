@@ -1,0 +1,5 @@
+name = "Enma"
+grammar = "enma"
+path_suffixes = ["em"]
+line_comments = ["// "]
+block_comments = ["/* ", " */"]

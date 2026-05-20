@@ -56,5 +56,14 @@ spike/tree-sitter-enma/parser.obj
 spike/tree-sitter-enma/scanner.obj
 spike/tree-sitter-enma/build/
 
+# Tree-sitter grammar — generated artifacts
+tree-sitter-enma/node_modules/
+tree-sitter-enma/src/
+tree-sitter-enma/build/
+tree-sitter-enma/*.wasm
+
+# Zed extension — Rust/Cargo build artifacts
+zed-extension/target/
+
 # pcx-extended-api — large binary doc; keep markdown sources
 pcx-extended-api/*.pdf
