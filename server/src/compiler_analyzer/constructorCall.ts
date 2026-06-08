@@ -1,20 +1,18 @@
 // Constructor lookup & call resolution.
 //
-// `new T(args)` analysis: locates T's constructor overload set, runs
-// resolveCall, returns ResolvedType for T (with pointer-level=1 since `new`
-// produces a heap pointer in Enma). Skeleton — full implementation in week 2.
+// `new T(args)` / `new T[N](args)` analysis: locates T's constructor overload
+// set, ranks it against the argument types, and yields ResolvedType T* (pointer
+// level 1 — `new` always produces a heap pointer in Enma, §7).
 
-import { TextLocation } from '../compiler_tokenizer/textLocation';
 import { ResolvedType } from './resolvedType';
-import {
-    SymbolFunctionHolder,
-    SymbolType,
-} from './symbolObject';
-import { SymbolScope, tryResolveActiveScope } from './symbolScope';
-import { resolveCall } from './functionCall';
+import { SymbolFunctionHolder, SymbolType } from './symbolObject';
+import { tryResolveActiveScope } from './symbolScope';
+import { resolveCall, CallResolutionStatus } from './functionCall';
 
 export interface ConstructorResult {
+    /** Resulting heap-pointer type `T*`, or undefined when no ctor matched. */
     type: ResolvedType | undefined;
+    status: CallResolutionStatus;
 }
 
 export function findConstructorHolder(t: SymbolType): SymbolFunctionHolder | undefined {
@@ -27,19 +25,16 @@ export function findConstructorHolder(t: SymbolType): SymbolFunctionHolder | und
 }
 
 export function analyzeConstructorCall(
-    _scope: SymbolScope,
     type: SymbolType,
     argTypes: ReadonlyArray<ResolvedType | undefined>,
-    location: TextLocation,
 ): ConstructorResult {
+    const pointerToT = new ResolvedType(type, 1);
     const holder = findConstructorHolder(type);
     if (!holder) {
-        // No explicit ctor — implicit one always succeeds. Return T*.
-        return { type: new ResolvedType(type, 1) };
+        // No explicit ctor — the implicit default/aggregate ctor always exists.
+        return { type: pointerToT, status: 'ok' };
     }
-    const r = resolveCall(holder, argTypes, location);
-    if (r.selected) {
-        return { type: new ResolvedType(type, 1) };
-    }
-    return { type: undefined };
+    const r = resolveCall(holder, argTypes);
+    if (r.status === 'no-match') return { type: pointerToT, status: 'no-match' };
+    return { type: pointerToT, status: r.status };
 }

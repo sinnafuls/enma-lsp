@@ -54,7 +54,6 @@ import { ResolvedType } from './resolvedType';
 import { tryGetBuiltinType, builtinThisToken } from './builtinType';
 import {
     analyzeFunctionBody,
-    analyzeStmtBlock,
     analyzeType,
     AnalyzeQueue,
     HoistQueue,
@@ -477,7 +476,7 @@ function hoistFunction(
     });
 
     aq.push(() => {
-        if (node.body !== null) analyzeFunctionBody(fnScope, node.body);
+        if (node.body !== null) analyzeFunctionBody(fnScope, node.body, sym.returnType);
     });
 
     // AC-9 — extern decls with [[dll(...)]] are permission-gated.
@@ -532,7 +531,7 @@ function hoistMethod(
     });
 
     aq.push(() => {
-        if (node.body !== null) analyzeStmtBlock(fnScope, node.body);
+        if (node.body !== null) analyzeFunctionBody(fnScope, node.body, sym.returnType);
     });
 
     hoistAnnotations(node.annotations, hq);
@@ -577,7 +576,7 @@ function hoistConstructor(parent: SymbolScope, node: NodeConstructor, aq: Analyz
 
     if (node.body !== null) {
         const body = node.body;
-        aq.push(() => analyzeStmtBlock(fnScope, body));
+        aq.push(() => analyzeFunctionBody(fnScope, body, undefined));
     }
     hoistAnnotations(node.annotations, hq);
 }
@@ -601,7 +600,7 @@ function hoistDestructor(parent: SymbolScope, node: NodeDestructor, aq: AnalyzeQ
 
     if (node.body !== null) {
         const body = node.body;
-        aq.push(() => analyzeStmtBlock(fnScope, body));
+        aq.push(() => analyzeFunctionBody(fnScope, body, undefined));
     }
     hoistAnnotations(node.annotations, hq);
 }

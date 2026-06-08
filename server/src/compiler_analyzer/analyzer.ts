@@ -45,6 +45,8 @@ import { tryGetBuiltinType } from './builtinType';
 import { findSymbolWithParent } from './symbolUtils';
 import { TextLocation } from '../compiler_tokenizer/textLocation';
 import { runEscapeAndConstCheck } from './escapeAndConstCheck';
+import { analyzeExpr } from './expressionAnalyzer';
+import { analyzeBody } from './statementAnalyzer';
 
 // ---- Queue types --------------------------------------------------------
 
@@ -92,7 +94,7 @@ export function analyzeAfterHoisted(uri: string, hoistResult: HoistResult): Anal
  *
  * Returns undefined on lookup failure (with diagnostic emitted).
  */
-export function analyzeType(scope: SymbolScope, node: NodeType): ResolvedType | undefined {
+export function analyzeType(scope: SymbolScope, node: NodeType, quiet = false): ResolvedType | undefined {
     if (node.path.length === 0) return undefined;
 
     const head = node.path[0];
@@ -115,18 +117,12 @@ export function analyzeType(scope: SymbolScope, node: NodeType): ResolvedType | 
                 // Unresolved generic types (e.g. array<T>, map<K,V>) at hoist time
                 // are a pre-monomorphization gap — demote to Warning so they don't
                 // count against the strict error threshold. Plain named unknowns stay Error.
-                if (node.generics.length > 0) {
-                    analyzerDiagnostic.warning(
-                        head.location,
-                        `Unknown generic type '${partText}' (unresolved pre-monomorphization)`,
-                        'EN_UNKNOWN_GENERIC',
-                    );
-                } else {
-                    analyzerDiagnostic.error(
-                        head.location,
-                        `Unknown type '${partText}'`,
-                        'EN_UNKNOWN_TYPE',
-                    );
+                if (!quiet) {
+                    if (node.generics.length > 0) {
+                        analyzerDiagnostic.warning(head.location, `Unknown generic type '${partText}' (unresolved pre-monomorphization)`, 'EN_UNKNOWN_GENERIC');
+                    } else {
+                        analyzerDiagnostic.error(head.location, `Unknown type '${partText}'`, 'EN_UNKNOWN_TYPE');
+                    }
                 }
                 return undefined;
             }
@@ -157,11 +153,7 @@ export function analyzeType(scope: SymbolScope, node: NodeType): ResolvedType | 
             const childScope = cur?.lookupScope(partText);
             const inner = cur?.lookupSymbol(partText);
             if (inner === undefined && childScope === undefined) {
-                analyzerDiagnostic.error(
-                    node.path[i].location,
-                    `Unknown member '${partText}' on '${node.path[i - 1].text}'`,
-                    'EN_UNKNOWN_TYPE',
-                );
+                if (!quiet) analyzerDiagnostic.error(node.path[i].location, `Unknown member '${partText}' on '${node.path[i - 1].text}'`, 'EN_UNKNOWN_TYPE');
                 return undefined;
             }
             if (childScope) cur = childScope;
@@ -170,11 +162,7 @@ export function analyzeType(scope: SymbolScope, node: NodeType): ResolvedType | 
     }
 
     if (symHolder === undefined || !(symHolder.symbol instanceof SymbolType)) {
-        analyzerDiagnostic.error(
-            head.location,
-            `'${headText}' is not a type`,
-            'EN_NOT_TYPE',
-        );
+        if (!quiet) analyzerDiagnostic.error(head.location, `'${headText}' is not a type`, 'EN_NOT_TYPE');
         return undefined;
     }
 
@@ -205,32 +193,21 @@ export function analyzeAnnotations(annotations: ReadonlyArray<NodeAnnotation>): 
     void annotations;
 }
 
-// ---- Statement / expression analysis stubs ----------------------------
-//
-// The full implementations live in matchStatement.ts / deferStatement.ts /
-// fStringExpr.ts / pointerRules.ts. Skeleton entry points below let hoist
-// register analyze-queue jobs that compile cleanly today; sub-analyzers slot
-// in during weeks 3–4.
+// ---- Statement / expression analysis (second pass) --------------------
 
 export function analyzeStmtBlock(scope: SymbolScope, block: NodeStmtBlock): void {
-    void scope;
-    void block;
+    analyzeBody(scope, block, undefined);
 }
 
-export function analyzeFunctionBody(funcScope: SymbolScope, body: NodeStmtBlock | null): void {
+export function analyzeFunctionBody(
+    funcScope: SymbolScope,
+    body: NodeStmtBlock | null,
+    returnType?: ResolvedType,
+): void {
     if (body === null) return;
-    analyzeStmtBlock(funcScope, body);
+    analyzeBody(funcScope, body, returnType);
 }
 
 export function analyzeExpression(scope: SymbolScope, expr: NodeExpr): ResolvedType | undefined {
-    void scope;
-    void expr;
-    return undefined;
-}
-
-// ---- Helpers ------------------------------------------------------------
-
-/** Unused-arg guard so we can accept arbitrary nodes without errors. */
-export function _walkUnused(_a: AnyNode | NodeStmt | NodeExpr | NodeTopLevel | NodeUsing | NodeNamespace | NodeClass | NodeStruct | NodeInterface | NodeEnum | NodeFunction | NodeMethod | NodeField | NodeVar | NodeStmtVar | NodeParam | NodeKind | NodeAnnotation | TextLocation): void {
-    // intentionally empty — present so the discriminated union references stay live.
+    return analyzeExpr(scope, expr);
 }
