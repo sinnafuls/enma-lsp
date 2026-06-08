@@ -178,6 +178,36 @@
         "command": "enma.unicorn.panel",
         "title": "Unicorn Reference Panel",
         "category": "Enma"
+      },
+      {
+        "command": "enma.aobSearch",
+        "title": "AOB Pattern Search (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.disassemble",
+        "title": "Disassemble at Address (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.lookupSymbol",
+        "title": "Lookup Symbol at Address (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.listExports",
+        "title": "List Module Exports (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.reconnectMcp",
+        "title": "Reconnect to Perception MCP",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.inspectEmb",
+        "title": "Inspect .emb Binary",
+        "category": "Enma"
       }
     ],
     "keybindings": [

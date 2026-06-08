@@ -24,4 +24,12 @@ describe('completion-extension service', () => {
         const r = provideCompletionOfToken(f.rawTokens, pos(5, 0));
         assert.equal(r, undefined);
     });
+
+    it('returns module completions when caret is inside import string', () => {
+        // 'import "math";' — string token spans cols 7-12; caret at col 9 (inside "math").
+        const f = buildFixture(URI, 'import "math";');
+        const r = provideCompletionOfToken(f.rawTokens, pos(0, 9));
+        assert.ok(r !== undefined, 'expected module completions, not undefined');
+        assert.ok(r!.some(item => item.label === 'math'), 'expected math in module completions');
+    });
 });

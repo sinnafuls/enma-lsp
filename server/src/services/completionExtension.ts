@@ -1,8 +1,9 @@
 // Completion in non-symbol token contexts.
 //
 //   - Caret in comment → return [] (suppress completion).
+//   - Caret in `import "..."` string → return stdlib module name completions.
 //   - Caret in plain string literal → return [].
-//   - Caret in `import "..."` / `#include "..."` string → glob workspace .em
+//   - Caret in `#include "..."` string → glob workspace .em
 //     files relative to the file's directory; emit File completions.
 
 import * as lsp from 'vscode-languageserver';
@@ -28,6 +29,9 @@ export function provideCompletionOfToken(
     }
 
     if (t.kind === TokenKind.String) {
+        if (isImportKeywordBefore(rawTokens, at.index)) {
+            return MODULE_COMPLETIONS;
+        }
         if (isIncludePathString(rawTokens, at.index)) {
             return globIncludeCompletions(t.location.uri, t.text);
         }
@@ -46,6 +50,39 @@ function isIncludePathString(rawTokens: ReadonlyArray<TokenObject>, idx: number)
         if (t.kind === TokenKind.Identifier && t.text === 'include') return true;
         if (t.kind === TokenKind.Punctuation && t.text === '#') continue;
         break;
+    }
+    return false;
+}
+
+// ---- Module completions -------------------------------------------------
+
+const MODULE_COMPLETIONS: lsp.CompletionItem[] = [
+    { label: 'arrays',     kind: lsp.CompletionItemKind.Module, insertText: 'arrays',     detail: 'array operations (sort, find, fill, map, filter, reduce)' },
+    { label: 'atomic',     kind: lsp.CompletionItemKind.Module, insertText: 'atomic',     detail: 'atomic operations and memory barriers' },
+    { label: 'bits',       kind: lsp.CompletionItemKind.Module, insertText: 'bits',       detail: 'bit manipulation (popcount, clz, ctz, byteswap)' },
+    { label: 'fs',         kind: lsp.CompletionItemKind.Module, insertText: 'fs',         detail: 'filesystem I/O (read, write, list files/dirs)' },
+    { label: 'hash_set',   kind: lsp.CompletionItemKind.Module, insertText: 'hash_set',   detail: 'unordered hash set' },
+    { label: 'json',       kind: lsp.CompletionItemKind.Module, insertText: 'json',       detail: 'JSON serializer/deserializer' },
+    { label: 'list',       kind: lsp.CompletionItemKind.Module, insertText: 'list',       detail: 'doubly-linked list' },
+    { label: 'math',       kind: lsp.CompletionItemKind.Module, insertText: 'math',       detail: 'math functions (sin, cos, sqrt, pow, abs, floor, ceil, random)' },
+    { label: 'math3d',     kind: lsp.CompletionItemKind.Module, insertText: 'math3d',     detail: '3D math (vec2/3/4, mat4, quat)' },
+    { label: 'net',        kind: lsp.CompletionItemKind.Module, insertText: 'net',        detail: 'HTTP and WebSocket client' },
+    { label: 'regex',      kind: lsp.CompletionItemKind.Module, insertText: 'regex',      detail: 'regular expressions' },
+    { label: 'simd',       kind: lsp.CompletionItemKind.Module, insertText: 'simd',       detail: 'SIMD vector operations' },
+    { label: 'sorted_map', kind: lsp.CompletionItemKind.Module, insertText: 'sorted_map', detail: 'sorted key-value map' },
+    { label: 'string',     kind: lsp.CompletionItemKind.Module, insertText: 'string',     detail: 'string manipulation (split, join, trim, replace, format, parse)' },
+    { label: 'thread',     kind: lsp.CompletionItemKind.Module, insertText: 'thread',     detail: 'threading (spawn, join, mutex, condition_variable)' },
+    { label: 'time',       kind: lsp.CompletionItemKind.Module, insertText: 'time',       detail: 'time functions (now, sleep, format)' },
+    { label: 'variant',    kind: lsp.CompletionItemKind.Module, insertText: 'variant',    detail: 'type-safe tagged union' },
+    { label: 'vec',        kind: lsp.CompletionItemKind.Module, insertText: 'vec',        detail: 'vector math (dot, cross, normalize, lerp)' },
+    { label: 'core',       kind: lsp.CompletionItemKind.Module, insertText: 'core',       detail: '(auto-registered) core built-ins (println, format, assert, sleep_ms)' },
+];
+
+function isImportKeywordBefore(rawTokens: ReadonlyArray<TokenObject>, idx: number): boolean {
+    for (let i = idx - 1; i >= 0; i--) {
+        const prev = rawTokens[i];
+        if (prev.kind === TokenKind.Comment) continue;
+        return prev.kind === TokenKind.Reserved && prev.text === 'import';
     }
     return false;
 }

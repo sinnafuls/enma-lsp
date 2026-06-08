@@ -32,6 +32,7 @@ import {
     SymbolFunctionHolder,
 } from './symbolObject';
 import type { SymbolObjectHolder } from './symbolObject';
+import type { ReferenceInfo } from './info';
 import { findSymbolWithParent } from './symbolUtils';
 import { analyzeType } from './analyzer';
 import { analyzerDiagnostic } from './analyzerDiagnostic';
@@ -156,7 +157,16 @@ export function analyzeExpr(scope: SymbolScope, expr: NodeExpr): ResolvedType | 
 
         case NodeKind.ExprIdentifier: {
             const found = findSymbolWithParent(scope, expr.token.text);
-            if (found?.symbol instanceof SymbolVariable) return found.symbol.type;
+            if (found?.symbol instanceof SymbolVariable) {
+                global.pushReference({ fromToken: expr.token, toSymbol: found.symbol });
+                return found.symbol.type;
+            }
+            if (found?.symbol instanceof SymbolFunctionHolder) {
+                global.pushReference({ fromToken: expr.token, toSymbol: found.symbol.first });
+            }
+            if (found?.symbol instanceof SymbolType) {
+                global.pushReference({ fromToken: expr.token, toSymbol: found.symbol });
+            }
             return undefined;
         }
 
@@ -201,13 +211,29 @@ export function analyzeExpr(scope: SymbolScope, expr: NodeExpr): ResolvedType | 
         case NodeKind.ExprMemberArrow: {
             const obj = analyzeExpr(scope, expr.object);
             const holder = lookupMemberHolder(global, obj, expr.member.text);
-            if (holder instanceof SymbolVariable) return applyTemplateTranslator(holder.type, obj?.templateTranslator);
+            if (holder instanceof SymbolVariable) {
+                global.pushReference({ fromToken: expr.member, toSymbol: holder });
+                return applyTemplateTranslator(holder.type, obj?.templateTranslator);
+            }
+            if (holder instanceof SymbolFunctionHolder) {
+                global.pushReference({ fromToken: expr.member, toSymbol: holder.first });
+            }
             return undefined;
         }
 
         case NodeKind.ExprNamespaceAccess: {
             const holder = resolveNamespaceMember(scope, expr);
-            return holder instanceof SymbolVariable ? holder.type : undefined;
+            if (holder instanceof SymbolVariable) {
+                global.pushReference({ fromToken: expr.member, toSymbol: holder });
+                return holder.type;
+            }
+            if (holder instanceof SymbolFunctionHolder) {
+                global.pushReference({ fromToken: expr.member, toSymbol: holder.first });
+            }
+            if (holder instanceof SymbolType) {
+                global.pushReference({ fromToken: expr.member, toSymbol: holder });
+            }
+            return undefined;
         }
 
         case NodeKind.ExprIndex: {
@@ -293,6 +319,7 @@ function analyzeCallExpr(scope: SymbolScope, expr: NodeExprCall): ResolvedType |
     if (callee.kind === NodeKind.ExprIdentifier) {
         const found = findSymbolWithParent(scope, callee.token.text);
         if (found?.symbol instanceof SymbolFunctionHolder) {
+            global.pushReference({ fromToken: callee.token, toSymbol: found.symbol.first });
             const r = resolveCall(found.symbol, argTypes);
             reportCall(r, callee.token.text, rangeToLocation(expr.range));
             return r.returnType;
@@ -313,6 +340,7 @@ function analyzeCallExpr(scope: SymbolScope, expr: NodeExprCall): ResolvedType |
         const obj = analyzeExpr(scope, callee.object);
         const holder = lookupMemberHolder(global, obj, callee.member.text);
         if (holder instanceof SymbolFunctionHolder) {
+            global.pushReference({ fromToken: callee.member, toSymbol: holder.first });
             const r = resolveCall(holder, argTypes);
             reportCall(r, callee.member.text, rangeToLocation(expr.range));
             return applyTemplateTranslator(r.returnType, obj?.templateTranslator);
@@ -323,6 +351,7 @@ function analyzeCallExpr(scope: SymbolScope, expr: NodeExprCall): ResolvedType |
     if (callee.kind === NodeKind.ExprNamespaceAccess) {
         const holder = resolveNamespaceMember(scope, callee);
         if (holder instanceof SymbolFunctionHolder) {
+            global.pushReference({ fromToken: callee.member, toSymbol: holder.first });
             const r = resolveCall(holder, argTypes);
             reportCall(r, callee.member.text, rangeToLocation(expr.range));
             return r.returnType;

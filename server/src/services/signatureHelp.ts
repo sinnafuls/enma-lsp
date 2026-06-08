@@ -35,7 +35,7 @@ export function provideSignatureHelp(
     const signatures: lsp.SignatureInformation[] = holder.overloadList.map(buildSignature);
     return {
         signatures,
-        activeSignature: 0,
+        activeSignature: bestActiveSignature(signatures, call.argIndex),
         activeParameter: call.argIndex,
     };
 }
@@ -62,6 +62,27 @@ function buildSignature(fn: SymbolFunction): lsp.SignatureInformation {
     return { label, parameters: params };
 }
 
+function bestActiveSignature(signatures: lsp.SignatureInformation[], argIndex: number): number {
+    // First pass: prefer overload with fewest params that still covers argIndex.
+    let bestIdx = 0;
+    let bestDelta = Infinity;
+    for (let i = 0; i < signatures.length; i++) {
+        const paramCount = signatures[i].parameters?.length ?? 0;
+        if (paramCount >= argIndex + 1) {
+            const delta = paramCount - argIndex;
+            if (delta < bestDelta) { bestDelta = delta; bestIdx = i; }
+        }
+    }
+    // If no overload has enough params (past the end of all), pick the longest.
+    if (bestDelta === Infinity) {
+        for (let i = 0; i < signatures.length; i++) {
+            const paramCount = signatures[i].parameters?.length ?? 0;
+            if (paramCount > (signatures[bestIdx].parameters?.length ?? 0)) bestIdx = i;
+        }
+    }
+    return bestIdx;
+}
+
 interface ActiveCall {
     calleeToken: TokenObject;
     argIndex: number;
@@ -70,6 +91,7 @@ interface ActiveCall {
 function findActiveCall(rawTokens: ReadonlyArray<TokenObject>, caret: TextPosition): ActiveCall | undefined {
     // Walk tokens preceding caret, tracking paren depth. A `(` at depth 0 is our active call.
     let depth = 0;
+    let braceDepth = 0;
     let argIndex = 0;
 
     // Collect tokens that end before-or-at caret, in reverse.
@@ -111,8 +133,11 @@ function findActiveCall(rawTokens: ReadonlyArray<TokenObject>, caret: TextPositi
                 argIndex++;
                 continue;
             }
-            if (t.text === ';' || t.text === '{' || t.text === '}') {
-                return undefined;
+            if (t.text === ';') return undefined;
+            if (t.text === '{') { braceDepth++; continue; }
+            if (t.text === '}') {
+                if (braceDepth > 0) { braceDepth--; continue; }
+                return undefined; // hit enclosing block
             }
         }
     }

@@ -39,4 +39,19 @@ describe('signatureHelp service', () => {
         const h = provideSignatureHelp(f.analyzerScope.globalScope, f.rawTokens, pos(0, 30));
         assert.equal(h, undefined);
     });
+
+    it('picks the 2-param overload when 2 args are typed', () => {
+        const src = 'void f(int32 a) {}\nvoid f(int32 a, int32 b) {}\nvoid main() { f(1, ';
+        const f = buildFixture(URI, src);
+        // Line 2: "void main() { f(1, " — caret at col 18 (trailing space after comma).
+        // One comma between '(' and caret → argIndex=1, so bestActiveSignature should
+        // select the overload whose parameter count covers index 1, i.e. the 2-param one.
+        const h = provideSignatureHelp(f.analyzerScope.globalScope, f.rawTokens, pos(2, 18));
+        assert.ok(h, 'expected signature help');
+        assert.ok(h!.signatures.length >= 2, `expected ≥2 overloads, got ${h!.signatures.length}`);
+        const sigIdx = h!.activeSignature ?? 0;
+        const active = h!.signatures[sigIdx];
+        assert.ok((active.parameters?.length ?? 0) >= 2,
+            `expected active overload to have ≥2 params, got ${active.parameters?.length ?? 0}`);
+    });
 });

@@ -63,4 +63,24 @@ describe('codeAction service', () => {
         assert.ok(actions.length >= 1);
         assert.ok(actions[0].title.toLowerCase().includes('override'));
     });
+
+    it('suggests Add import for known catalogue identifier', () => {
+        const f = buildFixture(URI, 'vec2 v;\n');
+        const actions = provideCodeAction(
+            f.analyzerScope.globalScope,
+            { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
+            {
+                uri: URI,
+                diagnostics: [{
+                    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
+                    message: "Unknown type 'vec2'",
+                    code: 'EN_UNKNOWN_TYPE',
+                    severity: 1,
+                }],
+            },
+        );
+        const titles = actions.map(a => a.title);
+        assert.ok(titles.some(t => t.includes('Add import "vec"')),
+            `expected 'Add import "vec"' quickfix, got: ${titles.join(', ')}`);
+    });
 });

@@ -201,7 +201,7 @@ function getRecord(uri: string): InspectRecord | undefined {
 function allReferenceTokens(): ReferenceTokens[] {
     const out: ReferenceTokens[] = [];
     for (const r of inspector.getAllRecords()) {
-        out.push({ uri: r.uri, rawTokens: r.rawTokens });
+        out.push({ uri: r.uri, rawTokens: r.rawTokens, analyzerInfo: r.analyzerScope.globalScope.info.reference });
     }
     return out;
 }

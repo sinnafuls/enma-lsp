@@ -11,6 +11,7 @@ import * as lsp from 'vscode-languageserver';
 import { TextPosition, TextLocation } from '../compiler_tokenizer/textLocation';
 import { TokenObject, TokenKind } from '../compiler_tokenizer/tokenObject';
 import { SymbolGlobalScope } from '../compiler_analyzer/symbolScope';
+import type { ReferenceInfo } from '../compiler_analyzer/info';
 import {
     findTokenAtPosition,
     findScopeAtPosition,
@@ -22,6 +23,8 @@ export interface ReferenceTokens {
     uri: string;
     /** all rawTokens for that file */
     rawTokens: ReadonlyArray<TokenObject>;
+    /** reference info emitted by the analyzer for this file (may be absent) */
+    analyzerInfo?: ReadonlyArray<ReferenceInfo>;
 }
 
 function locationToLspLocation(loc: TextLocation): lsp.Location {
@@ -66,16 +69,36 @@ export function provideReferences(
     };
 
     // Declaration sites (overloads).
-    for (const sym of holder.toList()) {
+    const declSymbols = holder.toList();
+    for (const sym of declSymbols) {
         push(sym.identifierToken.location);
     }
 
-    // Identifier-text matches across all rawTokens (best-effort).
-    for (const file of allFiles) {
-        for (const t of file.rawTokens) {
-            if (t.kind !== TokenKind.Identifier) continue;
-            if (t.text !== targetName) continue;
-            push(t.location);
+    // Check if any file has analyzer reference info available.
+    const analyzerInfoAvailable = allFiles.some(f => f.analyzerInfo !== undefined && f.analyzerInfo.length > 0);
+
+    if (analyzerInfoAvailable) {
+        // Use the precise reference table — no false positives from shadowed identifiers.
+        for (const file of allFiles) {
+            if (!file.analyzerInfo) continue;
+            for (const ref of file.analyzerInfo) {
+                const sym = ref.toSymbol;
+                const matched = declSymbols.some(
+                    s =>
+                        s.identifierToken.location.uri === sym.identifierToken.location.uri &&
+                        s.identifierToken.location.start.line === sym.identifierToken.location.start.line,
+                );
+                if (matched) push(ref.fromToken.location);
+            }
+        }
+    } else {
+        // Fall back to identifier-text scan (best-effort, may include shadowed names).
+        for (const file of allFiles) {
+            for (const t of file.rawTokens) {
+                if (t.kind !== TokenKind.Identifier) continue;
+                if (t.text !== targetName) continue;
+                push(t.location);
+            }
         }
     }
 

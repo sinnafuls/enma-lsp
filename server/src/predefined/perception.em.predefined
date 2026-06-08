@@ -200,6 +200,17 @@ enum keybind_mode { off, on, single, toggle, always_on }
 enum toast_kind { info, success, warning, error }
 enum ui_callback { value_changed, item_activated }
 
+// Widget lifecycle / rendering hook IDs. Partial — 33 total but only doc-confirmed
+// values are listed here. Pass to frame_t::install_hook / widget_t::install_hook.
+enum ui_hook {
+    pre_execute,
+    post_execute,
+    clicked,
+    right_clicked,
+    should_render,
+    widget_execute,
+}
+
 // modular_ui color hashes (subset). Used as keys for get_theme_color/set_theme_color.
 enum ui_color {
     bg,

@@ -199,6 +199,54 @@ export function stringifyFunction(holder: SymbolFunctionHolder): string {
     return `${ret} ${path}${f.identifierText}(${params})`;
 }
 
+// ---- Doc-comment extraction (for hover) --------------------------------
+
+/**
+ * Scan rawTokens backwards from the declaration token to find the leading
+ * documentation comment (kind=doc or kind=block) or a run of line comments.
+ * Returns the stripped text or undefined if none found within 3 blank lines.
+ */
+export function extractDocComment(
+    rawTokens: ReadonlyArray<TokenObject>,
+    declToken: TokenObject,
+): string | undefined {
+    // Find the index of declToken.
+    let declIdx = -1;
+    for (let i = 0; i < rawTokens.length; i++) {
+        if (rawTokens[i] === declToken) { declIdx = i; break; }
+    }
+    if (declIdx < 0) return undefined;
+
+    // Walk backwards collecting comments; stop at blank-line gap or non-comment token.
+    const commentLines: string[] = [];
+    let lastLine = declToken.location.start.line;
+    for (let i = declIdx - 1; i >= 0; i--) {
+        const t = rawTokens[i];
+        if (t.kind === TokenKind.EOF) continue;
+        if (t.kind !== TokenKind.Comment) break;
+        // Gap of more than 2 blank lines = unrelated comment.
+        if (lastLine - t.location.end.line > 2) break;
+        lastLine = t.location.start.line;
+
+        if (t.commentKind === 'doc' || t.commentKind === 'block') {
+            // Strip /** ... */ or /* ... */
+            let text = t.text.replace(/^\/\*+/, '').replace(/\*+\/$/, '');
+            // Strip leading `* ` on each line; filter blank lines.
+            text = text.split('\n')
+                .map(l => l.replace(/^\s*\*\s?/, '').trim())
+                .filter(l => l.length > 0)
+                .join('\n');
+            if (text.length > 0) commentLines.unshift(text);
+            break; // one block/doc comment is enough
+        }
+        if (t.commentKind === 'line') {
+            const text = t.text.replace(/^\/\/\s?/, '').trim();
+            if (text.length > 0) commentLines.unshift(text);
+        }
+    }
+    return commentLines.length > 0 ? commentLines.join('\n') : undefined;
+}
+
 // ---- Static keyword hover docs (ported from client/legacy/extension.js) -
 
 export const KEYWORD_HOVERS: Readonly<Record<string, string>> = {

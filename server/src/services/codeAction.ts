@@ -1,11 +1,12 @@
 // Code action provider — quick-fixes + refactor + source actions.
 //
 //   1. EN_UNKNOWN_TYPE quickfix: Levenshtein ≤2 "Did you mean?" candidates.
-//   2. EN_DOT_ON_POINTER / EN_ARROW_ON_VALUE: access-operator swap.
-//   3. EN_MISSING_OVERRIDE: insert 'override'.
-//   4. source.organizeImports: sort + deduplicate `import "..."` statements.
-//   5. source.fixAll: apply all in-range quick-fixes at once.
-//   6. refactor.rewrite.cast: wrap expression in cast<T>(x) (emitted on
+//   2. EN_UNKNOWN_TYPE quickfix: "Add import" for known catalogue identifiers.
+//   3. EN_DOT_ON_POINTER / EN_ARROW_ON_VALUE: access-operator swap.
+//   4. EN_MISSING_OVERRIDE: insert 'override'.
+//   5. source.organizeImports: sort + deduplicate `import "..."` statements.
+//   6. source.fixAll: apply all in-range quick-fixes at once.
+//   7. refactor.rewrite.cast: wrap expression in cast<T>(x) (emitted on
 //      EN_IMPLICIT_LOSSY diagnostics — available for future use).
 
 import * as lsp from 'vscode-languageserver';
@@ -44,6 +45,23 @@ export function provideCodeAction(
                         edit: {
                             changes: {
                                 [context.uri]: [{ range: diag.range, newText: cand }],
+                            },
+                        },
+                    });
+                }
+                // Auto-import suggestion for known catalogue identifiers.
+                const importModule = AUTO_IMPORT_CATALOGUE[word];
+                if (importModule !== undefined) {
+                    actions.push({
+                        title: `Add import "${importModule}"`,
+                        kind: lsp.CodeActionKind.QuickFix,
+                        diagnostics: [diag],
+                        edit: {
+                            changes: {
+                                [context.uri]: [{
+                                    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+                                    newText: `import "${importModule}";\n`,
+                                }],
                             },
                         },
                     });
@@ -188,6 +206,26 @@ function mergeEdits(
     return { changes: { [uri]: all } };
 }
 
+
+// ---- Auto-import catalogue ---------------------------------------------
+
+/** Identifier → stdlib module that exports it. */
+const AUTO_IMPORT_CATALOGUE: Record<string, string> = {
+    vec2:        'vec',
+    vec3:        'vec',
+    vec4:        'vec',
+    json_t:      'json',
+    json_parse:  'json',
+    json_stringify: 'json',
+    regex_t:     'regex',
+    regex_match: 'regex',
+    regex_find:  'regex',
+    thread_t:    'thread',
+    spawn:       'thread',
+    mutex_t:     'thread',
+    sorted_map:  'sorted_map',
+    hash_set:    'hash_set',
+};
 
 // ---- Known-type collection ---------------------------------------------
 

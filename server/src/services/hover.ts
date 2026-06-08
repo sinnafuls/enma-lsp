@@ -18,6 +18,7 @@ import {
     lookupSymbolByName,
     stringifySymbol,
     KEYWORD_HOVERS,
+    extractDocComment,
 } from './utils';
 
 export function provideHover(
@@ -51,10 +52,18 @@ export function provideHover(
     const holder = lookupSymbolByName(scope, token.text);
     if (holder === undefined) return undefined;
 
+    const declToken = holder.isFunctionHolder()
+        ? holder.first.identifierToken
+        : holder.identifierToken;
+    const rawUri = rawTokens.find(t => t.kind !== TokenKind.EOF)?.location.uri ?? '';
+    const doc = declToken.location.uri === rawUri
+        ? extractDocComment(rawTokens, declToken)
+        : undefined;
+    const sig = stringifySymbol(holder);
     return {
         contents: {
             kind: 'markdown',
-            value: '```enma\n' + stringifySymbol(holder) + '\n```',
+            value: '```enma\n' + sig + '\n```' + (doc !== undefined ? '\n\n' + doc : ''),
         },
     };
 }
