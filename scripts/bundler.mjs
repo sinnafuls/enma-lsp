@@ -30,6 +30,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // Match #include directives anywhere in a file (line-anchored, multiline).
 const INCLUDE_LINE_RE = /^[ \t]*#include[ \t]+"([^"]+)"[ \t]*\r?\n?/gm;
@@ -45,6 +46,9 @@ const INCLUDE_LINE_RE = /^[ \t]*#include[ \t]+"([^"]+)"[ \t]*\r?\n?/gm;
  *                                  dependency order.
  * @property {string[]} warnings    Non-fatal issues.
  * @property {string[]} errors      Fatal issues.
+ * @property {Array<{bundledLine: number, originalUri: string, originalLine: number}>} sourceMap
+ *   Maps bundled line numbers back to original source files. Each entry marks the
+ *   first line (0-indexed) at which an original file starts in the bundled output.
  */
 
 /**
@@ -62,24 +66,29 @@ export function bundle(srcDir, opts = {}) {
     /** @type {string[]} */ const manifest = [];
     /** @type {string[]} */ const warnings = [];
     /** @type {string[]} */ const errors = [];
+    /** @type {Array<{bundledLine: number, originalUri: string, originalLine: number}>} */
+    const sourceMap = [];
 
     if (!fs.existsSync(absDir) || !fs.statSync(absDir).isDirectory()) {
         errors.push(`source directory not found: ${absDir}`);
-        return { output: '', manifest, warnings, errors };
+        return { output: '', manifest, warnings, errors, sourceMap };
     }
 
     const files = collectEmFiles(absDir);
     if (files.length === 0) {
         warnings.push(`no .em files found under ${absDir}`);
-        return { output: renderHeader(absDir, manifest), manifest, warnings, errors };
+        return { output: renderHeader(absDir, manifest), manifest, warnings, errors, sourceMap };
     }
 
     const ordered = topoSort(files, absDir, errors);
     if (errors.length > 0) {
-        return { output: '', manifest, warnings, errors };
+        return { output: '', manifest, warnings, errors, sourceMap };
     }
 
-    const chunks = [];
+    /** @type {string[]} */ const chunks = [];
+    /** @type {Array<{bodyLine: number, file: string}>} */ const chunkMeta = [];
+    let bodyLine = 0;
+
     for (const file of ordered) {
         manifest.push(file);
         let content = fs.readFileSync(file, 'utf8');
@@ -94,14 +103,33 @@ export function bundle(srcDir, opts = {}) {
         }
 
         if (format) content = normalizeWhitespace(content);
-        if (content.length > 0) chunks.push(content);
+        if (content.length > 0) {
+            chunkMeta.push({ bodyLine, file });
+            // Lines in this chunk = newlines + 1. Next chunk starts after this
+            // chunk's lines plus the one blank separator line from '\n\n' joining.
+            const lineCount = (content.match(/\n/g) || []).length + 1;
+            bodyLine += lineCount + 1;
+            chunks.push(content);
+        }
     }
 
     let body = chunks.join('\n\n');
     if (format) body = normalizeWhitespace(body);
 
     const header = renderHeader(absDir, manifest);
-    return { output: header + body + '\n', manifest, warnings, errors };
+    // header is the elements joined with '\n'; number of newlines = elements - 1
+    // = (5 + manifest.length) - 1 = 4 + manifest.length.
+    const headerLines = (header.match(/\n/g) || []).length;
+
+    for (const { bodyLine: bl, file } of chunkMeta) {
+        sourceMap.push({
+            bundledLine: headerLines + bl,
+            originalUri: pathToFileURL(file).href,
+            originalLine: 0,
+        });
+    }
+
+    return { output: header + body + '\n', manifest, warnings, errors, sourceMap };
 }
 
 // --------------------------------------------------------------------------

@@ -14,11 +14,18 @@ import * as path from 'node:path';
 
 const BUNDLER_PATH = path.resolve(__dirname, '..', '..', '..', 'scripts', 'bundler.mjs');
 
+interface SourceMapEntry {
+    bundledLine: number;
+    originalUri: string;
+    originalLine: number;
+}
+
 interface BundleResult {
     output: string;
     manifest: string[];
     warnings: string[];
     errors: string[];
+    sourceMap: SourceMapEntry[];
 }
 
 function runBundler(srcDir: string, opts: { strip?: boolean } = {}): BundleResult {
@@ -139,5 +146,43 @@ describe('bundler', () => {
         const r = runBundler(missing);
         assert.ok(r.errors.some(e => /not found/i.test(e)),
             `expected a not-found error, got: ${r.errors.join('|')}`);
+    });
+
+    it('emits a sourceMap with one entry per file at correct bundled line offsets', () => {
+        // a.em sorts before b.em alphabetically, so the manifest order is [a.em, b.em].
+        fs.writeFileSync(path.join(dir, 'a.em'), `int32 a;\n`);
+        fs.writeFileSync(path.join(dir, 'b.em'), `int32 b;\n`);
+
+        const r = runBundler(dir);
+        assert.equal(r.errors.length, 0, r.errors.join('\n'));
+        assert.ok(Array.isArray(r.sourceMap), 'sourceMap is an array');
+        assert.equal(r.sourceMap.length, 2, 'one sourceMap entry per file');
+
+        const [entA, entB] = r.sourceMap;
+        assert.ok(entA.originalUri.endsWith('a.em'), `first entry should be a.em, got ${entA.originalUri}`);
+        assert.ok(entB.originalUri.endsWith('b.em'), `second entry should be b.em, got ${entB.originalUri}`);
+        assert.equal(entA.originalLine, 0, 'originalLine is 0');
+        assert.equal(entB.originalLine, 0, 'originalLine is 0');
+
+        // Non-strip mode: each chunk is "// ── File: x.em ──\nint32 x;" (2 lines).
+        // Chunks are separated by one blank line from '\n\n' joining.
+        // So gap between consecutive entry bundledLines = 2 (lines in chunk) + 1 (blank) = 3.
+        assert.ok(entA.bundledLine >= 0, 'bundledLine is non-negative');
+        assert.equal(
+            entB.bundledLine - entA.bundledLine,
+            3,
+            `expected gap of 3 between entries, got ${entB.bundledLine - entA.bundledLine}`,
+        );
+
+        // Verify the bundled line for a.em actually contains the file comment.
+        const outputLines = r.output.split('\n');
+        assert.ok(
+            outputLines[entA.bundledLine].includes('a.em'),
+            `line ${entA.bundledLine} should be the file comment for a.em, got: "${outputLines[entA.bundledLine]}"`,
+        );
+        assert.ok(
+            outputLines[entB.bundledLine].includes('b.em'),
+            `line ${entB.bundledLine} should be the file comment for b.em, got: "${outputLines[entB.bundledLine]}"`,
+        );
     });
 });

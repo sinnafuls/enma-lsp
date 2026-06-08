@@ -23,6 +23,13 @@ import { provideTypeDefinition, provideImplementation } from './services/navigat
 import { provideSelectionRanges } from './services/selectionRange';
 import { prepareTypeHierarchy, provideSupertypes, provideSubtypes } from './services/typeHierarchy';
 import { provideDocumentLinks } from './services/documentLink';
+import {
+    prepareCallHierarchy,
+    provideIncomingCalls,
+    provideOutgoingCalls,
+} from './services/callHierarchy';
+import { provideDocumentColors, provideColorPresentation } from './services/color';
+import { providePostfixCompletions } from './services/postfixCompletion';
 import { findTokenAtPosition } from './services/utils';
 import { TokenKind } from './compiler_tokenizer/tokenObject';
 import {
@@ -85,9 +92,15 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
             renameProvider: { prepareProvider: true },
             documentSymbolProvider: true,
             codeActionProvider: {
-                codeActionKinds: [lsp.CodeActionKind.QuickFix],
-                resolveProvider: true,
+                codeActionKinds: [
+                    lsp.CodeActionKind.QuickFix,
+                    lsp.CodeActionKind.SourceOrganizeImports,
+                    lsp.CodeActionKind.SourceFixAll,
+                    lsp.CodeActionKind.Refactor,
+                ],
             },
+            callHierarchyProvider: true,
+            colorProvider: true,
             semanticTokensProvider: {
                 legend: semanticTokensLegend,
                 range: false,
@@ -203,7 +216,8 @@ connection.onCompletion(({ textDocument, position }) => {
     if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
-    const items = provideCompletionOfToken(r.rawTokens, position)
+    const items = providePostfixCompletions(r.rawTokens, position)
+        ?? provideCompletionOfToken(r.rawTokens, position)
         ?? provideCompletion(r.analyzerScope.globalScope, r.rawTokens, position);
     // Stamp the source URI so onCompletionResolve resolves against the right
     // file's scope rather than guessing the most-recently-active record.
@@ -297,6 +311,22 @@ connection.languages.typeHierarchy.onSubtypes(({ item }) => {
     return provideSubtypes(allGlobalScopes(), item);
 });
 
+connection.languages.callHierarchy.onPrepare(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const items = prepareCallHierarchy(r.analyzerScope.globalScope, r.rawTokens, position);
+    return items.length > 0 ? items : null;
+});
+
+connection.languages.callHierarchy.onIncomingCalls(({ item }) => {
+    return provideIncomingCalls(allReferenceTokens(), item);
+});
+
+connection.languages.callHierarchy.onOutgoingCalls(({ item }) => {
+    return provideOutgoingCalls(allReferenceTokens(), item);
+});
+
 connection.onPrepareRename(({ textDocument, position }) => {
     if (!hasFullLsp(textDocument.uri)) return null;
     const r = getRecord(textDocument.uri);
@@ -347,7 +377,7 @@ connection.onCodeAction(({ textDocument, range, context }) => {
     return provideCodeAction(
         r.analyzerScope.globalScope,
         { start: range.start, end: range.end },
-        { diagnostics: context.diagnostics, uri: textDocument.uri },
+        { diagnostics: context.diagnostics, uri: textDocument.uri, content: r.content },
     );
 });
 
@@ -405,6 +435,16 @@ connection.onDocumentLinks(({ textDocument }) => {
         r.preprocessedOutput.includePathTokens,
         (rel) => resolveIncludeUri(textDocument.uri, rel, workspaceRoot),
     );
+});
+
+connection.onDocumentColor(({ textDocument }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideDocumentColors(r.ast, r.content);
+});
+
+connection.onColorPresentation(({ color, textDocument: _td, range }) => {
+    return provideColorPresentation(color, range);
 });
 
 connection.onWorkspaceSymbol(({ query }) => {

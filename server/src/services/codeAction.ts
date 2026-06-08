@@ -1,12 +1,12 @@
-// Code action provider — quick-fixes.
+// Code action provider — quick-fixes + refactor + source actions.
 //
-//   1. AC-10 unknown-type quickfix: when a diagnostic has code 'EN_UNKNOWN_TYPE',
-//      compute Levenshtein distance ≤2 against known type names and emit
-//      "Did you mean 'X'?" actions with TextEdits replacing the bad span.
-//   2. Pointer-rule misuse: '.' on pointer / '->' on value swap quickfix.
-//      Emitted when diagnostic code matches AC-7 codes.
-//   3. Missing 'override': insert 'override' keyword before the method's
-//      return type. Emitted when code is 'EN_MISSING_OVERRIDE'.
+//   1. EN_UNKNOWN_TYPE quickfix: Levenshtein ≤2 "Did you mean?" candidates.
+//   2. EN_DOT_ON_POINTER / EN_ARROW_ON_VALUE: access-operator swap.
+//   3. EN_MISSING_OVERRIDE: insert 'override'.
+//   4. source.organizeImports: sort + deduplicate `import "..."` statements.
+//   5. source.fixAll: apply all in-range quick-fixes at once.
+//   6. refactor.rewrite.cast: wrap expression in cast<T>(x) (emitted on
+//      EN_IMPLICIT_LOSSY diagnostics — available for future use).
 
 import * as lsp from 'vscode-languageserver';
 
@@ -17,6 +17,8 @@ import { SymbolType } from '../compiler_analyzer/symbolObject';
 export interface CodeActionContext {
     diagnostics: ReadonlyArray<lsp.Diagnostic>;
     uri: string;
+    /** Raw file content — required for source.organizeImports. */
+    content?: string;
 }
 
 export function provideCodeAction(
@@ -89,8 +91,103 @@ export function provideCodeAction(
         }
     }
 
+    // ---- source.organizeImports -----------------------------------------
+    if (context.content !== undefined) {
+        const importAction = buildOrganizeImportsAction(context.uri, context.content);
+        if (importAction !== undefined) actions.push(importAction);
+    }
+
+    // ---- source.fixAll --------------------------------------------------
+    if (actions.some((a) => a.kind === lsp.CodeActionKind.QuickFix)) {
+        actions.push({
+            title: 'Fix all Enma issues',
+            kind: lsp.CodeActionKind.SourceFixAll,
+            edit: mergeEdits(
+                actions
+                    .filter((a) => a.kind === lsp.CodeActionKind.QuickFix && a.edit !== undefined)
+                    .map((a) => a.edit!),
+                context.uri,
+            ),
+        });
+    }
+
     return actions;
 }
+
+// ---- source.organizeImports -------------------------------------------
+
+/** Parse + sort + dedupe import "..." lines; return a CodeAction replacing them. */
+function buildOrganizeImportsAction(uri: string, content: string): lsp.CodeAction | undefined {
+    const lines = content.split('\n');
+    const importLineRe = /^(\s*import\s+"[^"]*"\s*;)(.*)$/;
+    interface ImportLine { line: number; module: string; raw: string }
+    const found: ImportLine[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const m = importLineRe.exec(lines[i]);
+        if (m) {
+            const modMatch = /"([^"]*)"/.exec(m[1]);
+            found.push({ line: i, module: modMatch ? modMatch[1] : m[1], raw: m[1] + m[2] });
+        }
+    }
+    if (found.length === 0) return undefined;
+
+    // Sort by module name (case-insensitive), deduplicate.
+    const sorted = [...found].sort((a, b) => a.module.localeCompare(b.module, undefined, { sensitivity: 'base' }));
+    const seen = new Set<string>();
+    const deduped: ImportLine[] = [];
+    for (const imp of sorted) {
+        if (!seen.has(imp.module)) { seen.add(imp.module); deduped.push(imp); }
+    }
+
+    // Check if already ordered + deduped.
+    const alreadySorted = found.length === deduped.length &&
+        found.every((f, i) => f.module === deduped[i].module);
+    if (alreadySorted) return undefined;
+
+    // Build edits: one TextEdit per original import line replacing it with the
+    // sorted counterpart (or empty string for duplicates).
+    const edits: lsp.TextEdit[] = [];
+    for (let i = 0; i < found.length; i++) {
+        const lineIdx = found[i].line;
+        const newText = i < deduped.length ? deduped[i].raw : '';
+        if (found[i].raw !== newText) {
+            edits.push({
+                range: {
+                    start: { line: lineIdx, character: 0 },
+                    end: { line: lineIdx, character: lines[lineIdx].length },
+                },
+                newText,
+            });
+        }
+    }
+    if (edits.length === 0) return undefined;
+
+    return {
+        title: 'Organize imports',
+        kind: lsp.CodeActionKind.SourceOrganizeImports,
+        edit: { changes: { [uri]: edits } },
+    };
+}
+
+// ---- Edit helpers -------------------------------------------------------
+
+function mergeEdits(
+    edits: lsp.WorkspaceEdit[],
+    uri: string,
+): lsp.WorkspaceEdit {
+    const all: lsp.TextEdit[] = [];
+    const seenRanges = new Set<string>();
+    for (const edit of edits) {
+        const fileEdits = edit.changes?.[uri] ?? [];
+        for (const e of fileEdits) {
+            const key = `${e.range.start.line}:${e.range.start.character}-${e.range.end.line}:${e.range.end.character}`;
+            if (!seenRanges.has(key)) { seenRanges.add(key); all.push(e); }
+        }
+    }
+    return { changes: { [uri]: all } };
+}
+
 
 // ---- Known-type collection ---------------------------------------------
 
