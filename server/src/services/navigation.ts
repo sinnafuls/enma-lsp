@@ -59,7 +59,7 @@ export function provideTypeDefinition(
 }
 
 /** Collect every SymbolType reachable from the scope tree. */
-function collectAllTypes(global: SymbolGlobalScope): SymbolType[] {
+export function collectAllTypes(global: SymbolGlobalScope): SymbolType[] {
     const out: SymbolType[] = [];
     const visit = (scope: SymbolScope): void => {
         for (const holder of scope.symbolTable.values()) {

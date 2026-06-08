@@ -21,6 +21,7 @@ import { provideWorkspaceSymbol } from './services/workspaceSymbol';
 import { provideDocumentHighlight } from './services/documentHighlight';
 import { provideTypeDefinition, provideImplementation } from './services/navigation';
 import { provideSelectionRanges } from './services/selectionRange';
+import { prepareTypeHierarchy, provideSupertypes, provideSubtypes } from './services/typeHierarchy';
 import { findTokenAtPosition } from './services/utils';
 import { TokenKind } from './compiler_tokenizer/tokenObject';
 import {
@@ -77,6 +78,7 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
             implementationProvider: true,
             documentHighlightProvider: true,
             selectionRangeProvider: true,
+            typeHierarchyProvider: true,
             referencesProvider: true,
             renameProvider: { prepareProvider: true },
             documentSymbolProvider: true,
@@ -199,17 +201,26 @@ connection.onCompletion(({ textDocument, position }) => {
     if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
-    const tokenComp = provideCompletionOfToken(r.rawTokens, position);
-    if (tokenComp !== undefined) return tokenComp;
-    return provideCompletion(r.analyzerScope.globalScope, r.rawTokens, position);
+    const items = provideCompletionOfToken(r.rawTokens, position)
+        ?? provideCompletion(r.analyzerScope.globalScope, r.rawTokens, position);
+    // Stamp the source URI so onCompletionResolve resolves against the right
+    // file's scope rather than guessing the most-recently-active record.
+    for (const item of items) {
+        item.data = { ...(typeof item.data === 'object' && item.data !== null ? item.data : {}), uri: textDocument.uri };
+    }
+    return items;
 });
 
 connection.onCompletionResolve((item) => {
-    // Without per-resolve URI, take the most-recently-active record.
-    const all = inspector.getAllRecords();
-    if (all.length === 0) return item;
-    const r = all[all.length - 1];
-    return provideCompletionResolve(r.analyzerScope.globalScope, item);
+    const uri = typeof item.data === 'object' && item.data !== null
+        ? (item.data as { uri?: string }).uri
+        : undefined;
+    const r = uri !== undefined ? inspector.getRecord(uri) : undefined;
+    const fallback = inspector.getAllRecords();
+    const scope = r?.analyzerScope.globalScope
+        ?? (fallback.length > 0 ? fallback[fallback.length - 1].analyzerScope.globalScope : undefined);
+    if (scope === undefined) return item;
+    return provideCompletionResolve(scope, item);
 });
 
 connection.onSignatureHelp(({ textDocument, position }) => {
@@ -262,6 +273,26 @@ connection.onSelectionRanges(({ textDocument, positions }) => {
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
     return provideSelectionRanges(r.rawTokens, positions);
+});
+
+function allGlobalScopes() {
+    return inspector.getAllRecords().map((r) => r.analyzerScope.globalScope);
+}
+
+connection.languages.typeHierarchy.onPrepare(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const items = prepareTypeHierarchy(r.analyzerScope.globalScope, r.rawTokens, position);
+    return items.length > 0 ? items : null;
+});
+
+connection.languages.typeHierarchy.onSupertypes(({ item }) => {
+    return provideSupertypes(allGlobalScopes(), item);
+});
+
+connection.languages.typeHierarchy.onSubtypes(({ item }) => {
+    return provideSubtypes(allGlobalScopes(), item);
 });
 
 connection.onPrepareRename(({ textDocument, position }) => {
