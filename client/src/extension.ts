@@ -1,8 +1,11 @@
 import * as path from 'path';
 import {
+    commands,
     workspace,
     ExtensionContext,
     ConfigurationTarget,
+    StatusBarAlignment,
+    ThemeColor,
     window,
 } from 'vscode';
 
@@ -23,6 +26,8 @@ import { registerPredefinedAndSnapshot } from './predefinedAndSnapshot';
 import { registerAobExplorer } from './aobExplorer';
 import { registerZydisPlayground } from './zydisPlayground';
 import { registerUnicornPanel } from './unicornPanel';
+import { registerReCommands } from './mcpReverseEngineering';
+import { testMcpConnection, discoverMcpEndpoint } from './mcpClient';
 
 let client: LanguageClient | undefined;
 
@@ -85,6 +90,9 @@ export function activate(context: ExtensionContext): void {
     registerZydisPlayground(context);
     registerUnicornPanel(context);
 
+    // MCP reverse-engineering commands (AOB search, disasm, symbol lookup, exports).
+    registerReCommands(context);
+
     // §A11 Permissions banner: watch for workspace-scope flips of
     // enma.permissions.ffi or enma.permissions.file.
     context.subscriptions.push(
@@ -112,6 +120,43 @@ export function activate(context: ExtensionContext): void {
             // Workspace is already trusted — send effective settings to server.
             sendPermissionsToServer(ffiEnabled, fileEnabled);
         })
+    );
+
+    // §MCP status bar — shows live connection state.
+    const mcpBar = window.createStatusBarItem(StatusBarAlignment.Right, 100);
+    mcpBar.text = '$(plug) Enma MCP';
+    mcpBar.tooltip = `Enma MCP: ${discoverMcpEndpoint(
+        workspace.getConfiguration('enma.mcp').get<string>('endpoint') || undefined,
+    )}`;
+    mcpBar.show();
+    context.subscriptions.push(mcpBar);
+
+    const refreshMcpStatus = async (): Promise<void> => {
+        const ep = discoverMcpEndpoint(
+            workspace.getConfiguration('enma.mcp').get<string>('endpoint') || undefined,
+        );
+        mcpBar.tooltip = `Enma MCP: ${ep}`;
+        const ok = await testMcpConnection(ep);
+        if (ok) {
+            mcpBar.text = '$(plug) Enma';
+            mcpBar.backgroundColor = undefined;
+        } else {
+            mcpBar.text = '$(error) Enma MCP';
+            mcpBar.backgroundColor = new ThemeColor('statusBarItem.errorBackground');
+        }
+    };
+
+    // Initial probe — async, non-blocking.
+    refreshMcpStatus().catch(() => {/* status bar stays at default on error */});
+
+    context.subscriptions.push(
+        commands.registerCommand('enma.reconnectMcp', () => {
+            refreshMcpStatus().catch(() => {/* status bar stays at default on error */});
+        }),
+        workspace.onDidChangeConfiguration(e => {
+            if (!e.affectsConfiguration('enma.mcp')) return;
+            refreshMcpStatus().catch(() => {/* status bar stays at default on error */});
+        }),
     );
 }
 
