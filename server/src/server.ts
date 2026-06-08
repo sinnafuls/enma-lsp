@@ -1,7 +1,7 @@
 import * as lsp from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import * as fs from 'node:fs';
-import { Inspector, InspectRecord, InspectorSettings } from './inspector/inspector';
+import { Inspector, InspectRecord, InspectorSettings, resolveIncludeUri } from './inspector/inspector';
 
 import { provideHover } from './services/hover';
 import { provideCompletion } from './services/completion';
@@ -22,6 +22,7 @@ import { provideDocumentHighlight } from './services/documentHighlight';
 import { provideTypeDefinition, provideImplementation } from './services/navigation';
 import { provideSelectionRanges } from './services/selectionRange';
 import { prepareTypeHierarchy, provideSupertypes, provideSubtypes } from './services/typeHierarchy';
+import { provideDocumentLinks } from './services/documentLink';
 import { findTokenAtPosition } from './services/utils';
 import { TokenKind } from './compiler_tokenizer/tokenObject';
 import {
@@ -79,6 +80,7 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
             documentHighlightProvider: true,
             selectionRangeProvider: true,
             typeHierarchyProvider: true,
+            documentLinkProvider: { resolveProvider: false },
             referencesProvider: true,
             renameProvider: { prepareProvider: true },
             documentSymbolProvider: true,
@@ -394,6 +396,15 @@ connection.onFoldingRanges(({ textDocument }) => {
     const r = inspector.getRecord(textDocument.uri);
     if (r === undefined) return [];
     return provideFoldingRanges(r.rawTokens);
+});
+
+connection.onDocumentLinks(({ textDocument }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideDocumentLinks(
+        r.preprocessedOutput.includePathTokens,
+        (rel) => resolveIncludeUri(textDocument.uri, rel, workspaceRoot),
+    );
 });
 
 connection.onWorkspaceSymbol(({ query }) => {
