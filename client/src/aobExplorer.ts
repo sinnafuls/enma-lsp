@@ -11,11 +11,11 @@ let s_panel: WebviewPanel | undefined;
 
 export function registerAobExplorer(context: ExtensionContext): void {
     context.subscriptions.push(
-        commands.registerCommand('enma.aob.explore', () => openPanel()),
+        commands.registerCommand('enma.aob.explore', () => openPanel(context)),
     );
 }
 
-function openPanel(): void {
+function openPanel(context: ExtensionContext): void {
     if (s_panel) {
         s_panel.reveal(ViewColumn.Beside);
         return;
@@ -30,6 +30,11 @@ function openPanel(): void {
         },
     );
     s_panel.webview.html = renderHtml();
+    s_panel.webview.onDidReceiveMessage(msg => {
+        if (msg.command === 'aobSearch') {
+            commands.executeCommand('enma.aobSearch');
+        }
+    }, undefined, context.subscriptions);
     s_panel.onDidDispose(() => { s_panel = undefined; });
 }
 
@@ -54,6 +59,8 @@ function renderHtml(): string {
   .stats { margin-top: 0.6rem; }
   .stats span { display: inline-block; margin-right: 1rem; }
   code   { background: var(--vscode-textCodeBlock-background); padding: 0 0.25rem; border-radius: 2px; }
+  button { margin-top: 0.7rem; padding: 0.3rem 0.9rem; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; cursor: pointer; font-size: 13px; }
+  button:hover { background: var(--vscode-button-hoverBackground); }
 </style>
 </head>
 <body>
@@ -63,9 +70,11 @@ Tokens separated by whitespace. Example: <code>48 8B 05 ? ? ? ? 48 89 03</code>.
 <textarea id="pattern" placeholder="48 8B 05 ? ? ? ? 48 89 03"></textarea>
 <div class="stats" id="stats"></div>
 <table id="out"><thead><tr><th>#</th><th>hex</th><th>dec</th><th>wildcard?</th></tr></thead><tbody></tbody></table>
+<button id="liveSearch">Live AOB Search</button>
 
 <script nonce="${nonce}">
 (function() {
+    const vscodeApi = acquireVsCodeApi();
     const ta = document.getElementById('pattern');
     const tbody = document.querySelector('#out tbody');
     const stats = document.getElementById('stats');
@@ -101,6 +110,9 @@ Tokens separated by whitespace. Example: <code>48 8B 05 ? ? ? ? 48 89 03</code>.
         }
     }
     ta.addEventListener('input', render);
+    document.getElementById('liveSearch').addEventListener('click', function() {
+        vscodeApi.postMessage({ command: 'aobSearch' });
+    });
     render();
 })();
 </script>

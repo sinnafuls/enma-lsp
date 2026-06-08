@@ -16,3 +16,19 @@ bin/enma-language-server  text eol=lf
 # Binary or already-handled assets — leave to git's defaults.
 *.vsix                    binary
 *.pdf                     binary
+
+# ── GitHub Linguist ──────────────────────────────────────────────────
+# Generated documentation dumps dominate the byte count and made GitHub
+# misclassify the repository as HTML. Exclude them from language stats.
+client/resources/perception-docs.html   linguist-generated=true
+data/perception-docs.source.html        linguist-generated=true
+*.html                                   linguist-detectable=false
+# The tree-sitter grammar spike is vendored experimental tooling.
+spike/**                                 linguist-vendored=true
+# Generated/bundled JSON data and the TextMate grammar are not source.
+data/docs-catalogue.json                 linguist-generated=true
+data/enma-stdlib.json                    linguist-generated=true
+syntaxes/enma.tmLanguage.json            linguist-generated=true
+# Treat Enma sources as a first-class (vendored highlight via C++ proxy).
+*.em                                     linguist-language=C++ linguist-detectable=true
+*.em.predefined                          linguist-language=C++ linguist-detectable=true

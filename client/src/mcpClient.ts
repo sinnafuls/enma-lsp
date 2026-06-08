@@ -12,6 +12,7 @@ import {
     buildHeaders,
     buildInitialize,
     buildToolCall,
+    buildToolsList,
     unwrapResponse,
 } from './mcpRequest';
 
@@ -93,5 +94,52 @@ export class McpClient {
             throw new Error(`MCP server returned non-JSON body: ${text.slice(0, 80)}`);
         }
         return unwrapResponse(json);
+    }
+}
+
+const DEFAULT_MCP_ENDPOINT = 'http://127.0.0.1:9077/mcp';
+
+/**
+ * Returns the MCP endpoint to use. Prefers a non-empty `configEndpoint`,
+ * then falls back to the Perception default (`http://127.0.0.1:9077/mcp`).
+ */
+export function discoverMcpEndpoint(configEndpoint: string | undefined): string {
+    return (configEndpoint && configEndpoint.length > 0)
+        ? configEndpoint
+        : DEFAULT_MCP_ENDPOINT;
+}
+
+/**
+ * Probes the MCP server with a `tools/list` request.
+ * Returns `true` when a valid JSON-RPC 2.0 response arrives, `false` on any
+ * network error, timeout, or malformed reply.
+ */
+export async function testMcpConnection(endpoint: string, timeoutMs = 3000): Promise<boolean> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fetchImpl: typeof fetch | undefined = (globalThis as any).fetch;
+    if (typeof fetchImpl !== 'function') return false;
+    try {
+        const payload = buildToolsList();
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        let res: Response;
+        try {
+            res = await fetchImpl(endpoint, {
+                method: 'POST',
+                headers: buildHeaders(),
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
+        if (!res.ok) return false;
+        const text = await res.text();
+        const json: unknown = JSON.parse(text);
+        if (typeof json !== 'object' || json === null) return false;
+        const r = json as Record<string, unknown>;
+        return r['jsonrpc'] === '2.0' && ('result' in r || 'error' in r);
+    } catch {
+        return false;
     }
 }

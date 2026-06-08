@@ -1,11 +1,11 @@
-// AC-9 — permission gate for [[dll(...)]] and file-stdlib calls.
+// AC-9 — permission gate for [[dll(...)]], file-stdlib calls, and budget annotations.
 //
 // Permissions are read from a small in-memory settings object that the
 // inspector layer (Phase 5) wires up from `enma.permissions.*`. Default is
 // false (denied) — annotations / calls without the flag emit errorForce so
 // they survive R21 demotion.
 
-import { NodeAnnotation, NodeExprCall } from '../compiler_parser/nodes';
+import { NodeAnnotation, NodeExprCall, NodeKind } from '../compiler_parser/nodes';
 import { analyzerDiagnostic } from './analyzerDiagnostic';
 
 export interface AnalyzerPermissions {
@@ -44,32 +44,32 @@ export function checkDllAnnotationPermission(annotation: NodeAnnotation): void {
 }
 
 /**
- * File-stdlib callees gated behind enma.permissions.file. The matcher set is
- * the small list of functions in stdlib whose top-level name maps to a file
+ * File-stdlib callees gated behind enma.permissions.file. The matcher is a
+ * small Record of functions in stdlib whose top-level name maps to a file
  * operation; expand as the stdlib JSON evolves.
  */
-const FILE_STDLIB_NAMES: ReadonlySet<string> = new Set([
-    'fopen',
-    'fclose',
-    'fread',
-    'fwrite',
-    'fseek',
-    'ftell',
-    'remove',
-    'rename',
-    'file_open',
-    'file_read',
-    'file_write',
-    'file_close',
-]);
+const FILE_STDLIB_NAMES: Record<string, true> = {
+    fopen: true,
+    fclose: true,
+    fread: true,
+    fwrite: true,
+    fseek: true,
+    ftell: true,
+    remove: true,
+    rename: true,
+    file_open: true,
+    file_read: true,
+    file_write: true,
+    file_close: true,
+};
 
 export function isFileStdlibName(name: string): boolean {
-    return FILE_STDLIB_NAMES.has(name);
+    return FILE_STDLIB_NAMES[name] === true;
 }
 
 /** Emit the permission diagnostic for a file-stdlib call. */
 export function checkFileCallPermission(call: NodeExprCall, calleeName: string): void {
-    if (!FILE_STDLIB_NAMES.has(calleeName)) return;
+    if (FILE_STDLIB_NAMES[calleeName] !== true) return;
     if (s_perms.file) return;
     analyzerDiagnostic.errorForce(
         call.range.start
@@ -77,5 +77,51 @@ export function checkFileCallPermission(call: NodeExprCall, calleeName: string):
             : { uri: '', start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
         `'${calleeName}' requires permission flag enma.permissions.file`,
         'EN_PERM_FILE',
+    );
+}
+
+/** Budget annotation names that require a positive integer literal argument. */
+const BUDGET_ANNOTATION_NAMES: Record<string, true> = {
+    budget: true,
+    memory_budget: true,
+};
+
+/**
+ * Check that a [[budget(N)]] or [[memory_budget(N)]] annotation carries a
+ * positive integer literal as its first argument. Emits EN_BAD_BUDGET via
+ * errorForce (R21-exempt) when N is absent or non-integer.
+ */
+export function checkBudgetAnnotation(annotation: NodeAnnotation): void {
+    if (BUDGET_ANNOTATION_NAMES[annotation.name.text] !== true) return;
+    const name = annotation.name.text;
+    if (annotation.args.length === 0 || annotation.args[0].kind !== NodeKind.ExprLiteralInt) {
+        analyzerDiagnostic.errorForce(
+            annotation.name.location,
+            `[[${name}(N)]] requires a positive integer literal argument`,
+            'EN_BAD_BUDGET',
+        );
+    }
+}
+
+/** Call names that must receive at least one argument. */
+const SET_BUDGET_CALL_NAMES: Record<string, true> = {
+    set_budget: true,
+    set_memory_budget: true,
+};
+
+/**
+ * When calleeName is `set_budget` or `set_memory_budget`, verify that the call
+ * supplies at least one argument. Emits EN_BUDGET_ARGS via errorForce when the
+ * argument list is empty.
+ */
+export function checkSetBudgetCall(call: NodeExprCall, calleeName: string): void {
+    if (SET_BUDGET_CALL_NAMES[calleeName] !== true) return;
+    if (call.args.length > 0) return;
+    analyzerDiagnostic.errorForce(
+        call.range.start
+            ? { uri: '', start: call.range.start, end: call.range.end }
+            : { uri: '', start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+        `'${calleeName}' requires at least one argument`,
+        'EN_BUDGET_ARGS',
     );
 }

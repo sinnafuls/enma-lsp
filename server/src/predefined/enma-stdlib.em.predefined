@@ -419,7 +419,7 @@ string float_to_str(float64 arg0);
 string bool_to_str(bool arg0);
 variant vec3_sub(variant p0, variant p1);
 string char_to_str(char arg0);
-string format(string arg0);
+string format(string fmt, ...);
 int64 file_mtime(string arg0);
 bool json_value_has_key(variant p0, string p1);
 auto vec3_op_add();

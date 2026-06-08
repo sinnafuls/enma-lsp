@@ -1,0 +1,59 @@
+# This workflow verifies the analyzer never silently drifts from itself
+# (static self-consistency: corpus round-trips, unit tests, and type correctness).
+# E2E parity with the engine requires a live Perception process and is tracked separately.
+
+name: Analyzer–Engine Parity
+
+on:
+  push:
+    paths:
+      - 'server/src/compiler_analyzer/**'
+      - 'server/src/compiler_parser/**'
+      - 'server/src/services/**'
+      - 'data/enma-stdlib.json'
+      - '.github/workflows/analyzer-parity.yml'
+  pull_request:
+    paths:
+      - 'server/src/compiler_analyzer/**'
+      - 'server/src/compiler_parser/**'
+      - 'server/src/services/**'
+      - 'data/enma-stdlib.json'
+      - '.github/workflows/analyzer-parity.yml'
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate corpus
+        run: npm run corpus
+
+      - name: Test
+        run: npm test
+
+  type-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check
+        run: npx tsc -b --noEmit

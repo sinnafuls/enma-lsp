@@ -92,4 +92,57 @@ describe('autoImportCatalogue', () => {
         const src = 'void f() {}\n';
         assert.equal(preambleEndLine(src), 0);
     });
+
+    it('catalogue expansion: new vec scalar helpers', () => {
+        assert.equal(moduleForIdentifier('move_toward'), 'vec');
+        assert.equal(moduleForIdentifier('approx_eq'), 'vec');
+    });
+
+    it('catalogue expansion: new math3d constructors', () => {
+        assert.equal(moduleForIdentifier('quat_identity'), 'math3d');
+        assert.equal(moduleForIdentifier('quat_from_axis_angle'), 'math3d');
+        assert.equal(moduleForIdentifier('mat4_orthographic'), 'math3d');
+        assert.equal(moduleForIdentifier('mat4_look_at'), 'math3d');
+        assert.equal(moduleForIdentifier('mat4_from_quat'), 'math3d');
+        assert.equal(moduleForIdentifier('mat4_rotation_x'), 'math3d');
+    });
+
+    it('catalogue expansion: new json builder factories', () => {
+        assert.equal(moduleForIdentifier('json_object'), 'json');
+        assert.equal(moduleForIdentifier('json_array'), 'json');
+    });
+
+    it('catalogue expansion: new time functions', () => {
+        assert.equal(moduleForIdentifier('now_us'), 'time');
+        assert.equal(moduleForIdentifier('unix_seconds'), 'time');
+        assert.equal(moduleForIdentifier('iso_format'), 'time');
+        assert.equal(moduleForIdentifier('iso_parse'), 'time');
+        assert.equal(moduleForIdentifier('from_ymd'), 'time');
+        assert.equal(moduleForIdentifier('diff_s'), 'time');
+        assert.equal(moduleForIdentifier('is_leap'), 'time');
+    });
+
+    it('catalogue expansion: new thread free helpers', () => {
+        assert.equal(moduleForIdentifier('sleep_us'), 'thread');
+        assert.equal(moduleForIdentifier('yield_cpu'), 'thread');
+        assert.equal(moduleForIdentifier('hardware_threads'), 'thread');
+    });
+
+    it('catalogue expansion: new atomic barrier functions', () => {
+        assert.equal(moduleForIdentifier('memory_barrier'), 'atomic');
+        assert.equal(moduleForIdentifier('read_barrier'), 'atomic');
+        assert.equal(moduleForIdentifier('write_barrier'), 'atomic');
+    });
+
+    it('findMissingImports detects new catalogue symbols', () => {
+        const src = 'void f() { move_toward(a, b, 0.1); quat_identity(); json_object(); now_us(); sleep_us(1000); memory_barrier(); }\n';
+        const missing = findMissingImports(src);
+        const mods = new Set(missing.map(m => m.module));
+        assert.ok(mods.has('vec'), 'vec missing (move_toward)');
+        assert.ok(mods.has('math3d'), 'math3d missing (quat_identity)');
+        assert.ok(mods.has('json'), 'json missing (json_object)');
+        assert.ok(mods.has('time'), 'time missing (now_us)');
+        assert.ok(mods.has('thread'), 'thread missing (sleep_us)');
+        assert.ok(mods.has('atomic'), 'atomic missing (memory_barrier)');
+    });
 });

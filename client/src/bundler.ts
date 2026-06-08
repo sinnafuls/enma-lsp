@@ -29,6 +29,48 @@ import {
     Uri,
 } from 'vscode';
 
+// --------------------------------------------------------------------------
+// Source map — maps bundled line numbers back to original source files
+// --------------------------------------------------------------------------
+
+export interface SourceMapEntry {
+    bundledLine: number;
+    originalUri: string;
+    originalLine: number;
+}
+
+export interface BundleResult {
+    output: string;
+    manifest: string[];
+    warnings: string[];
+    errors: string[];
+    sourceMap?: SourceMapEntry[];
+}
+
+/**
+ * Binary-search `sourceMap` (sorted ascending by bundledLine) for the original
+ * source location that corresponds to `bundledLine`.
+ *
+ * Returns `undefined` when `bundledLine` falls before the first mapped entry
+ * (e.g. inside the header comment block).
+ */
+export function mapBundledLineTo(
+    sourceMap: SourceMapEntry[],
+    bundledLine: number,
+): { uri: string; line: number } | undefined {
+    if (sourceMap.length === 0) return undefined;
+    let lo = 0;
+    let hi = sourceMap.length - 1;
+    while (lo < hi) {
+        const mid = (lo + hi + 1) >>> 1;
+        if (sourceMap[mid].bundledLine <= bundledLine) lo = mid;
+        else hi = mid - 1;
+    }
+    const entry = sourceMap[lo];
+    if (entry.bundledLine > bundledLine) return undefined;
+    return { uri: entry.originalUri, line: bundledLine - entry.bundledLine + entry.originalLine };
+}
+
 interface ProjectConfig {
     name: string;
     sourceDirectory: string;

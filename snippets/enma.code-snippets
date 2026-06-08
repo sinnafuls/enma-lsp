@@ -192,5 +192,64 @@
       "delegate ${1:int32} ${2:Name}(${3:int32 x});"
     ],
     "description": "Delegate (function-pointer) type alias"
+  },
+  "if-init": {
+    "prefix": "ifinit",
+    "body": [
+      "if (auto ${1:r} = ${2:expr}; ${3:cond}) { $0 }"
+    ],
+    "description": "C++17-style if with initializer"
+  },
+  "trailing-return": {
+    "prefix": "autofn",
+    "body": [
+      "auto ${1:funcName}($2) -> ${3:ReturnType} { $0 }"
+    ],
+    "description": "Function with trailing return type"
+  },
+  "uniform-init": {
+    "prefix": "uninit",
+    "body": [
+      "${1:Type} ${2:name} { $0 }"
+    ],
+    "description": "Uniform initialisation"
+  },
+  "designated-init": {
+    "prefix": "desinit",
+    "body": [
+      "${1:Type} ${2:name} { .${3:field} = $0 }"
+    ],
+    "description": "Designated initialiser"
+  },
+  "defer-block": {
+    "prefix": "deferb",
+    "body": [
+      "defer { $0 }"
+    ],
+    "description": "Defer block — runs at scope exit"
+  },
+  "match-expr": {
+    "prefix": "matchexpr",
+    "body": [
+      "match ($1) {",
+      "\t$2 => $3,",
+      "\t_ => $0",
+      "}"
+    ],
+    "description": "Match expression (statement form)"
+  },
+  "coroutine-func": {
+    "prefix": "coro",
+    "body": [
+      "coroutine ${1:Type} ${2:name}($3) { yield $0; }"
+    ],
+    "description": "Coroutine function"
+  },
+  "try-catch": {
+    "prefix": "trystr",
+    "body": [
+      "try { $0 } catch (string e) { }"
+    ],
+    "description": "Try/catch with string exception"
   }
 }

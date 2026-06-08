@@ -13,7 +13,7 @@ export const AUTO_IMPORT_MODULES: ReadonlyMap<string, ReadonlyArray<string>> = n
         'dot', 'cross', 'normalize', 'length_of',
         'deg_to_rad', 'rad_to_deg',
         'ease_in', 'ease_out', 'ease_in_out',
-        'lerp_angle',
+        'lerp_angle', 'move_toward', 'approx_eq',
     ]],
     ['color', [
         'color',
@@ -23,22 +23,35 @@ export const AUTO_IMPORT_MODULES: ReadonlyMap<string, ReadonlyArray<string>> = n
         'mat4', 'quat',
         'mat4_identity', 'mat4_translate', 'mat4_rotate', 'mat4_scale',
         'mat4_perspective', 'mat4_lookat',
+        'mat4_translation', 'mat4_rotation_x', 'mat4_rotation_y', 'mat4_rotation_z',
+        'mat4_rotation_axis', 'mat4_from_quat', 'mat4_orthographic', 'mat4_look_at',
+        'mat4_get', 'mat4_set',
         'quat_from_euler', 'quat_slerp',
+        'quat_identity', 'quat_from_axis_angle',
     ]],
     ['regex', [
         'regex',
     ]],
     ['json', [
         'json_value', 'json_parse', 'json_stringify',
+        'json_object', 'json_array',
     ]],
     ['time', [
-        'now_ms', 'now_ns', 'sleep_ms',
+        'now_ms', 'now_ns', 'now_us', 'unix_seconds', 'mono_us', 'sleep_ms',
+        'iso_format', 'iso_parse',
+        'from_ymd', 'from_ymdhms',
+        'add_seconds', 'add_days',
+        'diff_us', 'diff_ms', 'diff_s',
+        'year', 'month', 'day', 'hour', 'minute', 'second',
+        'day_of_week', 'day_of_year', 'is_leap', 'days_in_month',
     ]],
     ['thread', [
         'thread', 'mutex', 'cond_var', 'lock_guard',
+        'sleep_us', 'yield_cpu', 'hardware_threads',
     ]],
     ['atomic', [
         'atomic_int32', 'atomic_int64',
+        'memory_barrier', 'read_barrier', 'write_barrier',
     ]],
     ['file', [
         'file_t', 'file_open', 'file_read', 'file_write',

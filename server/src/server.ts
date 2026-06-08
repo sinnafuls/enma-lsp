@@ -1,7 +1,7 @@
 import * as lsp from 'vscode-languageserver/node';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import * as fs from 'node:fs';
-import { Inspector, InspectRecord, InspectorSettings } from './inspector/inspector';
+import { Inspector, InspectRecord, InspectorSettings, resolveIncludeUri } from './inspector/inspector';
 
 import { provideHover } from './services/hover';
 import { provideCompletion } from './services/completion';
@@ -18,6 +18,22 @@ import { provideCodeAction } from './services/codeAction';
 import { documentOnTypeFormattingProvider } from './services/documentOnTypeFormatting';
 import { provideFoldingRanges } from './services/foldingRange';
 import { provideWorkspaceSymbol } from './services/workspaceSymbol';
+import { provideDocumentHighlight } from './services/documentHighlight';
+import { provideTypeDefinition, provideImplementation } from './services/navigation';
+import { provideSelectionRanges } from './services/selectionRange';
+import { prepareTypeHierarchy, provideSupertypes, provideSubtypes } from './services/typeHierarchy';
+import { provideDocumentLinks } from './services/documentLink';
+import {
+    prepareCallHierarchy,
+    provideIncomingCalls,
+    provideOutgoingCalls,
+} from './services/callHierarchy';
+import { provideDocumentColors, provideColorPresentation } from './services/color';
+import { providePostfixCompletions } from './services/postfixCompletion';
+import { provideCodeLens } from './services/codeLens';
+import { provideNumericInlayHints } from './services/inlayHint';
+import { findTokenAtPosition } from './services/utils';
+import { TokenKind } from './compiler_tokenizer/tokenObject';
 import {
     hasFullLsp,
     setResolvedProjects,
@@ -67,13 +83,27 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
                 retriggerCharacters: ['='],
             },
             definitionProvider: true,
+            declarationProvider: true,
+            typeDefinitionProvider: true,
+            implementationProvider: true,
+            documentHighlightProvider: true,
+            selectionRangeProvider: true,
+            typeHierarchyProvider: true,
+            documentLinkProvider: { resolveProvider: false },
             referencesProvider: true,
-            renameProvider: true,
+            renameProvider: { prepareProvider: true },
             documentSymbolProvider: true,
             codeActionProvider: {
-                codeActionKinds: [lsp.CodeActionKind.QuickFix],
-                resolveProvider: true,
+                codeActionKinds: [
+                    lsp.CodeActionKind.QuickFix,
+                    lsp.CodeActionKind.SourceOrganizeImports,
+                    lsp.CodeActionKind.SourceFixAll,
+                    lsp.CodeActionKind.Refactor,
+                ],
             },
+            callHierarchyProvider: true,
+            colorProvider: true,
+            codeLensProvider: { resolveProvider: false },
             semanticTokensProvider: {
                 legend: semanticTokensLegend,
                 range: false,
@@ -189,17 +219,27 @@ connection.onCompletion(({ textDocument, position }) => {
     if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
-    const tokenComp = provideCompletionOfToken(r.rawTokens, position);
-    if (tokenComp !== undefined) return tokenComp;
-    return provideCompletion(r.analyzerScope.globalScope, r.rawTokens, position);
+    const items = providePostfixCompletions(r.rawTokens, position)
+        ?? provideCompletionOfToken(r.rawTokens, position)
+        ?? provideCompletion(r.analyzerScope.globalScope, r.rawTokens, position);
+    // Stamp the source URI so onCompletionResolve resolves against the right
+    // file's scope rather than guessing the most-recently-active record.
+    for (const item of items) {
+        item.data = { ...(typeof item.data === 'object' && item.data !== null ? item.data : {}), uri: textDocument.uri };
+    }
+    return items;
 });
 
 connection.onCompletionResolve((item) => {
-    // Without per-resolve URI, take the most-recently-active record.
-    const all = inspector.getAllRecords();
-    if (all.length === 0) return item;
-    const r = all[all.length - 1];
-    return provideCompletionResolve(r.analyzerScope.globalScope, item);
+    const uri = typeof item.data === 'object' && item.data !== null
+        ? (item.data as { uri?: string }).uri
+        : undefined;
+    const r = uri !== undefined ? inspector.getRecord(uri) : undefined;
+    const fallback = inspector.getAllRecords();
+    const scope = r?.analyzerScope.globalScope
+        ?? (fallback.length > 0 ? fallback[fallback.length - 1].analyzerScope.globalScope : undefined);
+    if (scope === undefined) return item;
+    return provideCompletionResolve(scope, item);
 });
 
 connection.onSignatureHelp(({ textDocument, position }) => {
@@ -216,6 +256,94 @@ connection.onDefinition(({ textDocument, position }) => {
     const defs = provideDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
     if (defs.length > 0) return defs;
     return provideDefinitionFallback(r.rawTokens, textDocument.uri, position, workspaceRoot);
+});
+
+connection.onDeclaration(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const defs = provideDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
+    if (defs.length > 0) return defs;
+    return provideDefinitionFallback(r.rawTokens, textDocument.uri, position, workspaceRoot);
+});
+
+connection.onTypeDefinition(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    return provideTypeDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
+});
+
+connection.onImplementation(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    return provideImplementation(r.analyzerScope.globalScope, r.rawTokens, position);
+});
+
+connection.onDocumentHighlight(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return [];
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideDocumentHighlight(r.rawTokens, position);
+});
+
+connection.onSelectionRanges(({ textDocument, positions }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideSelectionRanges(r.rawTokens, positions);
+});
+
+function allGlobalScopes() {
+    return inspector.getAllRecords().map((r) => r.analyzerScope.globalScope);
+}
+
+connection.languages.typeHierarchy.onPrepare(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const items = prepareTypeHierarchy(r.analyzerScope.globalScope, r.rawTokens, position);
+    return items.length > 0 ? items : null;
+});
+
+connection.languages.typeHierarchy.onSupertypes(({ item }) => {
+    return provideSupertypes(allGlobalScopes(), item);
+});
+
+connection.languages.typeHierarchy.onSubtypes(({ item }) => {
+    return provideSubtypes(allGlobalScopes(), item);
+});
+
+connection.languages.callHierarchy.onPrepare(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const items = prepareCallHierarchy(r.analyzerScope.globalScope, r.rawTokens, position);
+    return items.length > 0 ? items : null;
+});
+
+connection.languages.callHierarchy.onIncomingCalls(({ item }) => {
+    return provideIncomingCalls(allReferenceTokens(), item);
+});
+
+connection.languages.callHierarchy.onOutgoingCalls(({ item }) => {
+    return provideOutgoingCalls(allReferenceTokens(), item);
+});
+
+connection.onPrepareRename(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const at = findTokenAtPosition(r.rawTokens, position);
+    if (at === undefined || at.token.kind !== TokenKind.Identifier) return null;
+    const loc = at.token.location;
+    return {
+        range: {
+            start: { line: loc.start.line, character: loc.start.character },
+            end: { line: loc.end.line, character: loc.end.character },
+        },
+        placeholder: at.token.text,
+    };
 });
 
 connection.onReferences(({ textDocument, position }) => {
@@ -252,7 +380,7 @@ connection.onCodeAction(({ textDocument, range, context }) => {
     return provideCodeAction(
         r.analyzerScope.globalScope,
         { start: range.start, end: range.end },
-        { diagnostics: context.diagnostics, uri: textDocument.uri },
+        { diagnostics: context.diagnostics, uri: textDocument.uri, content: r.content },
     );
 });
 
@@ -270,12 +398,17 @@ connection.languages.inlayHint.on(({ textDocument, range }) => {
     if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
-    return provideInlayHint(
+    const astHints = provideInlayHint(
         r.analyzerScope.globalScope,
         r.analyzerScope,
         r.ast,
         { start: range.start, end: range.end },
     );
+    const numericHints = provideNumericInlayHints(
+        r.rawTokens,
+        { start: range.start, end: range.end },
+    );
+    return [...astHints, ...numericHints];
 });
 
 connection.onDocumentFormatting(({ textDocument }) => {
@@ -301,6 +434,31 @@ connection.onFoldingRanges(({ textDocument }) => {
     const r = inspector.getRecord(textDocument.uri);
     if (r === undefined) return [];
     return provideFoldingRanges(r.rawTokens);
+});
+
+connection.onDocumentLinks(({ textDocument }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideDocumentLinks(
+        r.preprocessedOutput.includePathTokens,
+        (rel) => resolveIncludeUri(textDocument.uri, rel, workspaceRoot),
+    );
+});
+
+connection.onDocumentColor(({ textDocument }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideDocumentColors(r.ast, r.content);
+});
+
+connection.onColorPresentation(({ color, textDocument: _td, range }) => {
+    return provideColorPresentation(color, range);
+});
+
+connection.onCodeLens(({ textDocument }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideCodeLens(r.ast, textDocument.uri);
 });
 
 connection.onWorkspaceSymbol(({ query }) => {
