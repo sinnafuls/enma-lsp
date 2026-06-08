@@ -18,6 +18,11 @@ import { provideCodeAction } from './services/codeAction';
 import { documentOnTypeFormattingProvider } from './services/documentOnTypeFormatting';
 import { provideFoldingRanges } from './services/foldingRange';
 import { provideWorkspaceSymbol } from './services/workspaceSymbol';
+import { provideDocumentHighlight } from './services/documentHighlight';
+import { provideTypeDefinition, provideImplementation } from './services/navigation';
+import { provideSelectionRanges } from './services/selectionRange';
+import { findTokenAtPosition } from './services/utils';
+import { TokenKind } from './compiler_tokenizer/tokenObject';
 import {
     hasFullLsp,
     setResolvedProjects,
@@ -67,8 +72,13 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
                 retriggerCharacters: ['='],
             },
             definitionProvider: true,
+            declarationProvider: true,
+            typeDefinitionProvider: true,
+            implementationProvider: true,
+            documentHighlightProvider: true,
+            selectionRangeProvider: true,
             referencesProvider: true,
-            renameProvider: true,
+            renameProvider: { prepareProvider: true },
             documentSymbolProvider: true,
             codeActionProvider: {
                 codeActionKinds: [lsp.CodeActionKind.QuickFix],
@@ -216,6 +226,58 @@ connection.onDefinition(({ textDocument, position }) => {
     const defs = provideDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
     if (defs.length > 0) return defs;
     return provideDefinitionFallback(r.rawTokens, textDocument.uri, position, workspaceRoot);
+});
+
+connection.onDeclaration(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const defs = provideDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
+    if (defs.length > 0) return defs;
+    return provideDefinitionFallback(r.rawTokens, textDocument.uri, position, workspaceRoot);
+});
+
+connection.onTypeDefinition(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    return provideTypeDefinition(r.analyzerScope.globalScope, r.rawTokens, position);
+});
+
+connection.onImplementation(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    return provideImplementation(r.analyzerScope.globalScope, r.rawTokens, position);
+});
+
+connection.onDocumentHighlight(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return [];
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideDocumentHighlight(r.rawTokens, position);
+});
+
+connection.onSelectionRanges(({ textDocument, positions }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideSelectionRanges(r.rawTokens, positions);
+});
+
+connection.onPrepareRename(({ textDocument, position }) => {
+    if (!hasFullLsp(textDocument.uri)) return null;
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return null;
+    const at = findTokenAtPosition(r.rawTokens, position);
+    if (at === undefined || at.token.kind !== TokenKind.Identifier) return null;
+    const loc = at.token.location;
+    return {
+        range: {
+            start: { line: loc.start.line, character: loc.start.character },
+            end: { line: loc.end.line, character: loc.end.character },
+        },
+        placeholder: at.token.text,
+    };
 });
 
 connection.onReferences(({ textDocument, position }) => {
