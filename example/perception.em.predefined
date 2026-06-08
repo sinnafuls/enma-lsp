@@ -102,6 +102,7 @@ class proc_t {
     uint64 get_module_size(string name);
     uint64 get_proc_address(uint64 module_base, string export_name);
     uint64 get_import_rdata_address(uint64 module_base, string import_name);
+    array<module_info_t> get_module_list();
 
     // Pattern scanning
     uint64 find_code_pattern(uint64 search_start, uint64 search_size, string sig);
@@ -139,6 +140,12 @@ class vad_region_t {
     uint64 size();
     uint64 protection();
     bool heap_likely();
+}
+
+class module_info_t {
+    string name();    // base DLL filename, e.g. "kernel32.dll"
+    uint64 base();    // DllBase
+    uint64 size();    // SizeOfImage
 }
 
 proc_t ref_process(string name);
@@ -191,6 +198,18 @@ enum ui_edge { left, top, right, bottom }
 enum ui_layout { none, vertical, horizontal }
 enum keybind_mode { off, on, single, toggle, always_on }
 enum toast_kind { info, success, warning, error }
+enum ui_callback { value_changed, item_activated }
+
+// Widget lifecycle / rendering hook IDs. Partial — 33 total but only doc-confirmed
+// values are listed here. Pass to frame_t::install_hook / widget_t::install_hook.
+enum ui_hook {
+    pre_execute,
+    post_execute,
+    clicked,
+    right_clicked,
+    should_render,
+    widget_execute,
+}
 
 // modular_ui color hashes (subset). Used as keys for get_theme_color/set_theme_color.
 enum ui_color {
@@ -615,7 +634,9 @@ class http_response_t {
 }
 
 http_response_t http_get(string url, int64 timeout_ms);
+http_response_t http_get(string url, map<string, string> headers, int64 timeout_ms);
 http_response_t http_post(string url, string content_type, string body, int64 timeout_ms);
+http_response_t http_post(string url, string content_type, string body, map<string, string> headers, int64 timeout_ms);
 
 class ws_message_t {
     bool ok();
@@ -634,6 +655,17 @@ class ws_t {
 }
 
 ws_t ws_connect(string url, int64 timeout_ms);
+
+class udp_t {
+    bool bind(string addr, int64 port);
+    bool send_to(array<uint8> data, string addr, int64 port);
+    array<uint8> recv(int64 timeout_ms);
+    string last_sender_addr();
+    int64 last_sender_port();
+    void close();
+}
+
+udp_t udp_create();
 
 // ============================================================================
 // 09 - Render API
@@ -993,6 +1025,8 @@ bool fs_create_directory(string path);
 bool fs_delete_directory(string path);
 bool fs_dir_exists(string path);
 array<string> fs_list_files(string path);
+array<string> fs_list_dirs(string path);
+array<string> fs_list_all(string path);
 
 bool fs_write_file_binary(string path, array<uint8> data);
 bool fs_append_file_binary(string path, array<uint8> data);
