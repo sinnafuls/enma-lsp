@@ -1,0 +1,177 @@
+# enma-lsp
+
+VS Code extension + stdio LSP for Enma, Perception's JIT-compiled C++-flavored scripting language.
+
+Repository: https://github.com/sinnafuls/enma-lsp
+Extension ID: sin.enma-language   File extension: .em   Predefined surfaces: .em.predefined
+
+---
+## Enma language quick-reference
+
+C++-flavored syntax, AOT+JIT-compiled to native, no garbage collector.
+
+### Primitive types
+  int8 int16 int32 int64   uint8 uint16 uint32 uint64
+  float32 float64   bool   char   string   void
+  aint32 aint64  (atomic variants — require `import "atomic";`)
+
+### Composite types
+  class  struct  interface  enum  enum class  namespace  template<typename T>
+
+### Qualifiers
+  const  nullable  out  volatile
+
+### Heap
+  T* p = new T(args);   T* a = new T[N];   delete p;   delete[] a;
+
+### Closures
+  [capture](params) -> RetType { body }   // explicit return type
+  [](params) => expr                      // expression body
+
+### f-strings
+  f"value={x}"   // depth >= 2: f"outer={f"inner={y}"}"
+
+### Annotations
+  [[packed]]  [[align(N)]]  [[dll("lib.dll")]]  [[budget(N)]]  [[inline]]
+
+### Coroutines
+  coroutine int32 producer() { yield 1; }
+  coroutine_t handle = producer();
+
+### Pattern matching
+  int32 r = match (x) { 0 => 100, 1 => 200, _ => 0 };
+
+### defer
+  defer { cleanup(); }   // LIFO, runs at scope exit
+
+### Pointer rules
+  value.field   ptr->field   *ptr
+
+### Imports
+  import "vec";   // required for any stdlib module (see below)
+
+### Other features
+  Multi-inheritance + interfaces, operator overloading, properties (get/set),
+  try/catch/throw, switch/match, variadic (...) with __va_count/__va_arg(i),
+  designated struct initializers {.x=0,.y=0}, function references @fn,
+  intrinsics __asm_rdtsc()/__asm_pause(), preprocessor #include/#define/#ifdef
+
+---
+## Stdlib modules (all require explicit import)
+
+  string arrays maps math math3d simd variant atomic bits time regex
+  thread vec hash_set sorted_map list json hash
+
+Auto-registered without import: println  format  assert  sleep_ms  (core)
+
+---
+## Perception API (auto-registered, no import needed)
+
+  lifecycle    register_routine(name, fn)   main()   unload callback
+  render       draw_text  draw_rect  draw_line  draw_circle  get_font*
+  proc         proc_t handle type
+               ref_process(pid_or_name)         // acquire
+               read_typed<T>(proc, addr)         // memory read
+               write_typed<T>(proc, addr, val)   // memory write
+               find_code_pattern(proc, aob)      // AOB scan → address
+               get_module_list  get_module_base  alloc_vm  dereference
+  cpu          CPU info, CPUID, perf counters
+  filesystem   file read/write/enumerate
+  sound        audio playback
+  zydis        disassembly (Zydis backend)
+  win          Win32 API surface
+  input        keyboard/mouse hooks
+  unicorn      CPU emulation (Unicorn backend)
+  net          http_get(url)  http_post(url, body)  ws_connect(url)  udp
+
+Full surface with all overloads + doc comments:
+  server/src/predefined/perception.em.predefined
+
+---
+## LSP setup for AI coding tools
+
+### Claude Code
+~/.claude/lsp.json (or workspace .claude/lsp.json):
+
+  {
+    "enma": {
+      "command": ["node", "/abs/path/to/enma-lsp/bin/enma-language-server.js"],
+      "extensions": [".em", ".em.predefined"]
+    }
+  }
+
+Or: claude mcp add enma-lsp node /abs/path/to/enma-lsp/bin/enma-language-server.js
+
+### Build first (required)
+  git clone https://github.com/sinnafuls/enma-lsp.git
+  cd enma-lsp && npm install && npm run compile
+
+The launcher (bin/enma-language-server.js) defaults to --stdio; no flag needed
+for non-VS Code clients.
+
+### Other editors
+Full configs for Neovim (3 paths), Helix, Zed, Sublime LSP, JetBrains, Cursor,
+Antigravity, OpenCode, GitHub Copilot CLI → docs/standalone-lsp.md
+
+---
+## Perception MCP (for AI agents interacting with a live Perception instance)
+
+### Enable & connect
+  Perception Settings → MCP → toggle on, note the port.
+  claude mcp add --transport http perception http://127.0.0.1:<port>/mcp
+
+### ALWAYS call script/get_context first
+  Enma is proprietary — model training data is incomplete. This tool returns
+  the current API surface, active scripts, and session facts. Skipping it
+  produces stale or incorrect completions.
+
+### Address precision
+  Use hex strings ("0x7ff800001234") — never JSON numbers. JS loses precision
+  past 2^53, which is below typical 64-bit addresses.
+
+### Handle lifecycle
+  Acquire via reference_by_pid / reference_by_name. Call dereference when done.
+  Handles are not auto-released.
+
+### 59 tools covering
+  Process enumeration   list_processes  reference_by_pid  reference_by_name
+                        dereference  get_process_info
+  Memory R/W            read_memory  write_memory  read_typed  write_typed
+                        alloc_vm  free_vm  protect_vm
+  Modules               get_module_list  get_module_base  get_module_info
+                        get_module_exports  get_module_imports
+  PE analysis           pe_headers  pe_sections  pe_exports  pe_imports
+  Scanning              find_code_pattern  scan_aob  scan_value  scan_string
+  Cross-references      find_xrefs_to  find_xrefs_from
+  Signatures            generate_signature  ida_sig_to_aob
+  RTTI / symbols        rtti_scan  symbol_lookup  demangle
+  Vtables               vtable_scan  vtable_resolve
+  Disassembly           disassemble  disassemble_function  disassemble_range
+  Enma scripts          script/get_context  script/execute  script/validate
+                        script/list  script/stop
+
+Full guide with examples → docs/mcp-for-ai.md
+
+---
+## Key files
+
+  server/src/predefined/perception.em.predefined   Perception API surface (LSP source of truth)
+  server/src/predefined/enma-stdlib.em.predefined  Enma stdlib surface (LSP source of truth)
+  docs/standalone-lsp.md                           Editor setup guide
+  docs/mcp-for-ai.md                               Full Perception MCP guide for AI agents
+  AGENTS.md                                        Contributing guide for AI agents
+  samples/showcase.em                              One of every grammar construct
+  example/                                         Larger examples: proc, math, net, zydis, unicorn…
+  syntaxes/enma.tmLanguage.json                    TextMate grammar
+  snippets/enma.code-snippets                      ~70 language snippets
+  snippets/stdlib.code-snippets                    stdlib snippets
+
+---
+## Build & test
+
+  npm install && npm run compile   # tsc + copy-predefined + esbuild
+  npm test                         # 1078 passing unit tests
+
+Tests cover: parser (round-trip, error recovery), completer, hover, signature help,
+formatter, go-to-definition, find-references, rename, predefined loader, bundler,
+diagnostics engine.
