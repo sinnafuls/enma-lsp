@@ -27,6 +27,7 @@ import { registerAobExplorer } from './aobExplorer';
 import { registerZydisPlayground } from './zydisPlayground';
 import { registerUnicornPanel } from './unicornPanel';
 import { registerReCommands } from './mcpReverseEngineering';
+import { registerEmbInspector } from './embInspector';
 import { testMcpConnection, discoverMcpEndpoint } from './mcpClient';
 
 let client: LanguageClient | undefined;
@@ -92,6 +93,9 @@ export function activate(context: ExtensionContext): void {
 
     // MCP reverse-engineering commands (AOB search, disasm, symbol lookup, exports).
     registerReCommands(context);
+
+    // .emb binary module inspector.
+    registerEmbInspector(context);
 
     // §A11 Permissions banner: watch for workspace-scope flips of
     // enma.permissions.ffi or enma.permissions.file.
