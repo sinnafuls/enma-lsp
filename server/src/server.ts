@@ -30,6 +30,8 @@ import {
 } from './services/callHierarchy';
 import { provideDocumentColors, provideColorPresentation } from './services/color';
 import { providePostfixCompletions } from './services/postfixCompletion';
+import { provideCodeLens } from './services/codeLens';
+import { provideNumericInlayHints } from './services/inlayHint';
 import { findTokenAtPosition } from './services/utils';
 import { TokenKind } from './compiler_tokenizer/tokenObject';
 import {
@@ -101,6 +103,7 @@ connection.onInitialize((params: lsp.InitializeParams): lsp.InitializeResult => 
             },
             callHierarchyProvider: true,
             colorProvider: true,
+            codeLensProvider: { resolveProvider: false },
             semanticTokensProvider: {
                 legend: semanticTokensLegend,
                 range: false,
@@ -395,12 +398,17 @@ connection.languages.inlayHint.on(({ textDocument, range }) => {
     if (!hasFullLsp(textDocument.uri)) return [];
     const r = getRecord(textDocument.uri);
     if (r === undefined) return [];
-    return provideInlayHint(
+    const astHints = provideInlayHint(
         r.analyzerScope.globalScope,
         r.analyzerScope,
         r.ast,
         { start: range.start, end: range.end },
     );
+    const numericHints = provideNumericInlayHints(
+        r.rawTokens,
+        { start: range.start, end: range.end },
+    );
+    return [...astHints, ...numericHints];
 });
 
 connection.onDocumentFormatting(({ textDocument }) => {
@@ -445,6 +453,12 @@ connection.onDocumentColor(({ textDocument }) => {
 
 connection.onColorPresentation(({ color, textDocument: _td, range }) => {
     return provideColorPresentation(color, range);
+});
+
+connection.onCodeLens(({ textDocument }) => {
+    const r = getRecord(textDocument.uri);
+    if (r === undefined) return [];
+    return provideCodeLens(r.ast, textDocument.uri);
 });
 
 connection.onWorkspaceSymbol(({ query }) => {

@@ -11,6 +11,8 @@
 import * as lsp from 'vscode-languageserver';
 
 import { TextRange } from '../compiler_tokenizer/textLocation';
+import { TokenObject, TokenKind } from '../compiler_tokenizer/tokenObject';
+import { positionLess } from './utils';
 import {
     NodeScript,
     NodeKind,
@@ -207,4 +209,45 @@ function emitParameterNameHints(call: NodeExprCall, globalScope: SymbolGlobalSco
             paddingRight: true,
         });
     }
+}
+
+// ---- Numeric literal inlay hints ---------------------------------------
+//
+// Grounded in §A.v1.1 of the Enma docs: hex (0x…) and binary (0b…) literals
+// are valid literal forms. Showing the decimal equivalent inline eliminates
+// manual mental conversion when reading RE scripts full of 0x… addresses.
+
+const HEX_RE = /^0[xX][0-9A-Fa-f_]+$/;
+const BIN_RE = /^0[bB][01_]+$/;
+
+/**
+ * Scan raw tokens in `range` and emit a decimal-value chip after each
+ * hex (`0x…`) or binary (`0b…`) integer literal. Pure token-level — no AST
+ * or scope required.
+ */
+export function provideNumericInlayHints(
+    rawTokens: ReadonlyArray<TokenObject>,
+    range: TextRange,
+): lsp.InlayHint[] {
+    const out: lsp.InlayHint[] = [];
+    for (const t of rawTokens) {
+        if (t.kind !== TokenKind.Number) continue;
+        if (positionLess(t.location.end, range.start)) continue;
+        if (positionLess(range.end, t.location.start)) break;
+        const text = t.text.replace(/_/g, '');  // strip digit separators
+        let value: bigint | undefined;
+        if (HEX_RE.test(t.text)) {
+            try { value = BigInt(text); } catch { /* malformed */ }
+        } else if (BIN_RE.test(t.text)) {
+            try { value = BigInt(text); } catch { /* malformed */ }
+        }
+        if (value === undefined) continue;
+        out.push({
+            position: { line: t.location.end.line, character: t.location.end.character },
+            label: ` = ${value}`,
+            kind: lsp.InlayHintKind.Type,
+            paddingLeft: true,
+        });
+    }
+    return out;
 }
