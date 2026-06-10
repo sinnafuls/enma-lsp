@@ -30,6 +30,33 @@ describe('color service', () => {
         assert.equal(results.length, 0);
     });
 
+    it('detects color() inside a bracket-lambda body', () => {
+        const f = buildFixture(URI, 'void test() { auto cb = []() -> void { color(1.0, 0.0, 0.0, 1.0); }; }\n');
+        const results = provideDocumentColors(f.ast, f.content);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].color.red, 1);
+    });
+
+    it('detects color() inside an arrow-lambda expression body', () => {
+        const f = buildFixture(URI, 'void test() { auto mk = () => color(0.0, 1.0, 0.0, 1.0); }\n');
+        const results = provideDocumentColors(f.ast, f.content);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].color.green, 1);
+    });
+
+    it('detects color() inside a designated initializer', () => {
+        const f = buildFixture(URI, 'void test() { Theme t = { .bg = color(0.0, 0.0, 1.0, 1.0) }; }\n');
+        const results = provideDocumentColors(f.ast, f.content);
+        assert.equal(results.length, 1);
+        assert.equal(results[0].color.blue, 1);
+    });
+
+    it('detects color() inside an array initializer', () => {
+        const f = buildFixture(URI, 'void test() { array<color> arr = { color(1.0, 0.0, 0.0, 1.0), color(0.0, 1.0, 0.0, 1.0) }; }\n');
+        const results = provideDocumentColors(f.ast, f.content);
+        assert.equal(results.length, 2);
+    });
+
     it('provideColorPresentation returns formatted label and textEdit', () => {
         const range = { start: { line: 0, character: 0 }, end: { line: 0, character: 24 } };
         const color = { red: 1, green: 0.5, blue: 0, alpha: 1 };

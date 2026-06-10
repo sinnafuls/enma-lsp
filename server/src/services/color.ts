@@ -91,6 +91,36 @@ function walkExpr(expr: NodeExpr, out: lsp.ColorInformation[]): void {
         case NodeKind.ExprParen:
             walkExpr(expr.inner, out);
             break;
+        case NodeKind.ExprCast:
+            walkExpr(expr.value, out);
+            break;
+        case NodeKind.ExprNew:
+            for (const a of expr.args) walkExpr(a, out);
+            if (expr.arraySize !== null) walkExpr(expr.arraySize, out);
+            break;
+        case NodeKind.ExprNamespaceAccess:
+            walkExpr(expr.scope, out);
+            break;
+        case NodeKind.ExprLambdaBracket:
+            walkStmt(expr.body, out);
+            break;
+        case NodeKind.ExprLambdaArrow:
+            if (expr.body.kind === NodeKind.StmtBlock) walkStmt(expr.body, out);
+            else walkExpr(expr.body, out);
+            break;
+        case NodeKind.ExprDesignatedInit:
+            for (const field of expr.fields) walkExpr(field.value, out);
+            break;
+        case NodeKind.ExprArrayInit:
+            for (const el of expr.elements) walkExpr(el, out);
+            break;
+        case NodeKind.ExprMatch:
+            walkExpr(expr.subject, out);
+            for (const arm of expr.arms) {
+                walkExpr(arm.pattern, out);
+                walkExpr(arm.body, out);
+            }
+            break;
     }
 }
 
