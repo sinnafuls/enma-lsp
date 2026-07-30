@@ -1,10 +1,89 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "comment": "Catalogue of declarations pulled from the docs MCP servers (enma-docs + perception-docs). Refresh workflow lives in docs/docs-mcp-sync.md. The sync script (scripts/sync-from-docs-mcp.mjs) reads this file and append-only-merges new symbols into the bundled predefined files. Start with an empty `symbols` array; each refresh PR appends real entries.",
-  "generatedAt": "2026-05-18T00:00:00.000Z",
+  "comment": "Catalogue of declarations pulled from docs.perception.cx (enma-lang + host APIs). Refresh workflow: docs/docs-mcp-sync.md. Append-only merge into bundled predefined via npm run sync-docs. Modern containers live in enma-std-containers.em.predefined (not catalogue-appended).",
+  "generatedAt": "2026-07-30T18:01:57.479Z",
   "sources": [
-    "mcp__enma-docs__searchDocumentation",
-    "mcp__perception-docs__getPage"
+    "https://docs.perception.cx/llms.txt",
+    "https://docs.perception.cx/perception/lifecycle-and-routines.md",
+    "https://docs.perception.cx/perception/proc-api.md",
+    "https://docs.perception.cx/perception/gui-api.md",
+    "https://docs.perception.cx/perception/net-api.md",
+    "https://docs.perception.cx/perception/render-api.md",
+    "https://docs.perception.cx/perception/unicorn-api.md",
+    "https://docs.perception.cx/perception/win-api.md",
+    "https://docs.perception.cx/perception/zydis-api.md",
+    "https://docs.perception.cx/perception/enma-lang/addons/std-library.md"
   ],
-  "symbols": []
+  "symbols": [
+    {
+      "module": "perception",
+      "name": "dbg_print",
+      "kind": "function",
+      "declaration": "void dbg_print(const string& s);",
+      "source": "https://docs.perception.cx/perception/lifecycle-and-routines.md"
+    },
+    {
+      "module": "perception",
+      "name": "dbg_print_int",
+      "kind": "function",
+      "declaration": "void dbg_print_int(int64 x);",
+      "source": "https://docs.perception.cx/perception/lifecycle-and-routines.md"
+    },
+    {
+      "module": "perception",
+      "name": "body",
+      "kind": "function",
+      "declaration": "string body(http_response_t r);",
+      "source": "https://docs.perception.cx/perception/net-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "payload",
+      "kind": "function",
+      "declaration": "string payload(ws_message_t m);",
+      "source": "https://docs.perception.cx/perception/net-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "mem_write",
+      "kind": "function",
+      "declaration": "bool mem_write(cpu_t cpu, int64 addr, const vector& bytes);",
+      "source": "https://docs.perception.cx/perception/unicorn-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "mem_read",
+      "kind": "function",
+      "declaration": "vector mem_read(cpu_t cpu, int64 addr, int64 size);",
+      "source": "https://docs.perception.cx/perception/unicorn-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "process_name",
+      "kind": "function",
+      "declaration": "string process_name(window_info_t info);",
+      "source": "https://docs.perception.cx/perception/win-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "get_selected",
+      "kind": "function",
+      "declaration": "string get_selected(file_picker_t p);",
+      "source": "https://docs.perception.cx/perception/gui-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "set_items",
+      "kind": "function",
+      "declaration": "void set_items(list_t w, const vector& info1, const vector& info2);",
+      "source": "https://docs.perception.cx/perception/gui-api.md"
+    },
+    {
+      "module": "perception",
+      "name": "add_row",
+      "kind": "function",
+      "declaration": "void add_row(table_t w, const vector& cells);",
+      "source": "https://docs.perception.cx/perception/gui-api.md"
+    }
+  ]
 }

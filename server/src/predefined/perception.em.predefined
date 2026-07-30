@@ -1,29 +1,72 @@
-// Perception host API declarations.
-// Loaded by the LSP from the workspace; not bundled with the stdlib.
-// Mirrors the PDF docs at pcx-extended-api/03..13 with corrections from
-// the OCR'd source and ground-truth example/*.em scripts.
-// ----------------------------------------------------------------------------
-// Anything already in enma-stdlib.em.predefined (array, map, vec2/3/4, quat,
-// mat4, string, mutex etc.) is intentionally NOT redeclared here.
+// Perception host API declarations for Enma (.em).
+// Bundled by enma-lsp — do NOT place a copy in your project unless you intend
+// to override symbols (workspace .em.predefined wins over bundled).
+//
+// Authority (refreshed against docs.perception.cx, 2026-07-28 layout):
+//   https://docs.perception.cx/perception/readme.md
+//   https://docs.perception.cx/perception/lifecycle-and-routines.md
+//   https://docs.perception.cx/perception/proc-api.md
+//   https://docs.perception.cx/perception/cpu-api.md
+//   https://docs.perception.cx/perception/gui-api.md
+//   https://docs.perception.cx/perception/input-api.md
+//   https://docs.perception.cx/perception/net-api.md
+//   https://docs.perception.cx/perception/render-api.md
+//   https://docs.perception.cx/perception/sound-api.md
+//   https://docs.perception.cx/perception/unicorn-api.md
+//   https://docs.perception.cx/perception/win-api.md
+//   https://docs.perception.cx/perception/zydis-api.md
+//   https://docs.perception.cx/perception/mcp-api.md
+//
+// Type spelling in this file:
+//   - Bare `string` / `wstring` = language primitives (= std::string / std::wstring
+//     under `using namespace std;`). Both const char* and string& overloads are
+//     declared where the docs ship them.
+//   - Dynamic buffers use `vector<T>` (see enma-std-containers.em.predefined).
+//   - Free functions take the handle first when the docs say so (string/vector
+//     shapes that type_builder methods cannot own).
+//
+// Math types (vec2/3/4, quat, mat4) come from enma-stdlib / math-3d — not here.
 
 // ============================================================================
-// 03 - Lifecycle and routines
+// Lifecycle and routines
+// https://docs.perception.cx/perception/lifecycle-and-routines.md
 // ============================================================================
+
+// int64 main() — positive return keeps the script loaded; <= 0 unloads after main.
 
 int64 register_routine(int64 fn_handle, int64 data);
-bool unregister_routine(int64 routine_handle);
+bool  unregister_routine(int64 routine_handle);
 
 void heartbeat();
+void dbg_print(const char* s);
+void dbg_print(const string& s);
+void dbg_print_int(int64 x);
 void take_int(int64 x);
 void take_ptr(int64 p);
-void test_3arg(int64 a, int64 b, int64 c);
 
-// Heavily used in every example script — log a line to perception's console.
-void print_console(string msg);
+// Legacy / example-corpus alias still seen in docs samples.
+void print_console(const char* msg);
+void print_console(const string& msg);
 
 // ============================================================================
-// 04 - Proc API
+// Proc API
+// https://docs.perception.cx/perception/proc-api.md
+// proc_t is move-only RAII. No deref(). Addresses are uint64.
+// Gates: write_memory | virtual_memory_operations | kernel_rw_access
 // ============================================================================
+
+class vad_region_t {
+    uint64 start();
+    uint64 size();
+    uint64 protection();
+    bool heap_likely();
+}
+
+class module_info_t {
+    string name();
+    uint64 base();
+    uint64 size();
+}
 
 class proc_t {
     // Identity
@@ -32,20 +75,21 @@ class proc_t {
     uint32 pid();
     bool alive();
     bool is_valid_address(uint64 addr);
+    uint64 get_eprocess();                          // gated: kernel_rw_access
 
     // Read primitives
-    uint8 ru8(uint64 addr);
+    uint8  ru8(uint64 addr);
     uint16 ru16(uint64 addr);
     uint32 ru32(uint64 addr);
     uint64 ru64(uint64 addr);
-    int8 r8(uint64 addr);
-    int16 r16(uint64 addr);
-    int32 r32(uint64 addr);
-    int64 r64(uint64 addr);
+    int8   r8(uint64 addr);
+    int16  r16(uint64 addr);
+    int32  r32(uint64 addr);
+    int64  r64(uint64 addr);
     float32 rf32(uint64 addr);
     float64 rf64(uint64 addr);
-    string rs(uint64 addr, int32 max_chars);
-    string rws(uint64 addr, int32 max_chars);
+    string  rs(uint64 addr, int32 max_chars);
+    wstring rws(uint64 addr, int32 max_chars);
 
     // Write primitives (gated: write_memory)
     bool wu8(uint64 addr, uint8 v);
@@ -58,14 +102,16 @@ class proc_t {
     bool w64(uint64 addr, int64 v);
     bool wf32(uint64 addr, float32 v);
     bool wf64(uint64 addr, float64 v);
-    bool ws(uint64 addr, string text);
-    bool wws(uint64 addr, string text);
+    bool ws(uint64 addr, const char* text);
+    bool ws(uint64 addr, const string& text);
+    bool wws(uint64 addr, const wstring& text);
 
-    // Bulk read/write
-    array<uint8> rvm(uint64 addr, uint64 size);
-    bool wvm(uint64 addr, array<uint8> bytes);
+    // Bulk r/w — pointer form + vector form
+    bool rvm(uint64 addr, void* out, int64 size);
+    bool wvm(uint64 addr, void* buf, int64 size);                 // gated: write_memory
+    bool wvm(uint64 addr, const vector& bytes);                   // gated: write_memory
 
-    // Typed vector / quaternion / matrix reads (gated: read_memory)
+    // Typed vector / quaternion / matrix
     vec2 read_vec2_fl32(uint64 addr);
     vec2 read_vec2_fl64(uint64 addr);
     vec3 read_vec3_fl32(uint64 addr);
@@ -77,7 +123,6 @@ class proc_t {
     mat4 read_mat4_fl32(uint64 addr);
     mat4 read_mat4_fl64(uint64 addr);
 
-    // Typed vector / quaternion / matrix writes (gated: write_memory)
     bool write_vec2_fl32(uint64 addr, vec2 v);
     bool write_vec2_fl64(uint64 addr, vec2 v);
     bool write_vec3_fl32(uint64 addr, vec3 v);
@@ -89,70 +134,60 @@ class proc_t {
     bool write_mat4_fl32(uint64 addr, mat4 m);
     bool write_mat4_fl64(uint64 addr, mat4 m);
 
-    // SIMD-width reads/writes
-    array<uint8> r128(uint64 addr);
-    array<uint8> r256(uint64 addr);
-    array<uint8> r512(uint64 addr);
-    bool w128(uint64 addr, array<uint8> bytes);
-    bool w256(uint64 addr, array<uint8> bytes);
-    bool w512(uint64 addr, array<uint8> bytes);
+    // Fixed-width SIMD reads (docs: std::array<uint8,N>; LSP uses vector)
+    vector r128(uint64 addr);
+    vector r256(uint64 addr);
+    vector r512(uint64 addr);
+    bool w128(uint64 addr, const vector& bytes);
+    bool w256(uint64 addr, const vector& bytes);
+    bool w512(uint64 addr, const vector& bytes);
 
-    // Modules and exports
-    uint64 get_module_base(string name);
-    uint64 get_module_size(string name);
-    uint64 get_proc_address(uint64 module_base, string export_name);
-    uint64 get_import_rdata_address(uint64 module_base, string import_name);
-    array<module_info_t> get_module_list();
+    // Modules / exports
+    uint64 get_module_base(const char* name);
+    uint64 get_module_base(const string& name);
+    uint64 get_module_size(const char* name);
+    uint64 get_module_size(const string& name);
+    vector get_module_list();
+    uint64 get_proc_address(uint64 module_base, const char* export_name);
+    uint64 get_proc_address(uint64 module_base, const string& export_name);
+    uint64 get_import_rdata_address(uint64 module_base, const char* import_name);
+    uint64 get_import_rdata_address(uint64 module_base, const string& import_name);
 
     // Pattern scanning
-    uint64 find_code_pattern(uint64 search_start, uint64 search_size, string sig);
-    array<uint64> find_all_code_patterns(uint64 search_start, uint64 search_size, string sig);
+    uint64 find_code_pattern(uint64 search_start, uint64 search_size, const char* sig);
+    uint64 find_code_pattern(uint64 search_start, uint64 search_size, const string& sig);
+    vector find_all_code_patterns(uint64 search_start, uint64 search_size, const char* sig);
+    vector find_all_code_patterns(uint64 search_start, uint64 search_size, const string& sig);
 
-    // Threads
-    array<uint64> get_all_tebs();
-
-    // Pointer arrays
-    array<uint64> read_pointer_array(uint64 base, int64 count, int64 offset_delta);
-
-    // VAD / virtual_query
+    // Threads / pointer arrays / VAD
+    vector get_all_tebs();
+    vector read_pointer_array(uint64 base, int64 count, int64 offset_delta);
     vad_region_t virtual_query(uint64 address);
-    array<vad_region_t> get_vad_snapshot(bool heap_likely_only);
+    vector get_vad_snapshot(bool heap_likely_only);
 
     // Memory scans
-    array<uint64> scan_string(string text, bool heap_only);
-    array<uint64> scan_wstring(string text, bool heap_only);
-    array<uint64> scan_pointer(uint64 target, bool heap_only);
-    array<uint64> scan_u64(uint64 value, bool heap_only);
-    array<uint64> scan_u32(uint32 value, bool heap_only);
-    array<uint64> scan_float(float32 value, bool heap_only);
-    array<uint64> scan_double(float64 value, bool heap_only);
+    vector scan_string(const char* text, bool heap_only);
+    vector scan_string(const string& text, bool heap_only);
+    vector scan_wstring(const char* text, bool heap_only);
+    vector scan_wstring(const string& text, bool heap_only);
+    vector scan_pointer(uint64 target, bool heap_only);
+    vector scan_u64(uint64 value, bool heap_only);
+    vector scan_u32(uint32 value, bool heap_only);
+    vector scan_float(float32 value, bool heap_only);
+    vector scan_double(float64 value, bool heap_only);
 
-    // VM alloc / free (gated: virtual_memory_operations)
+    // VM alloc (gated: virtual_memory_operations)
     uint64 alloc_vm(uint64 size);
     bool free_vm(uint64 address);
-
-    // Kernel pointer (gated: kernel_rw_access)
-    uint64 get_eprocess();
 }
 
-class vad_region_t {
-    uint64 start();
-    uint64 size();
-    uint64 protection();
-    bool heap_likely();
-}
-
-class module_info_t {
-    string name();    // base DLL filename, e.g. "kernel32.dll"
-    uint64 base();    // DllBase
-    uint64 size();    // SizeOfImage
-}
-
-proc_t ref_process(string name);
 proc_t ref_process(uint32 pid);
+proc_t ref_process(const char* name);
+proc_t ref_process(const string& name);
 
 // ============================================================================
-// 05 - CPU API
+// CPU API
+// https://docs.perception.cx/perception/cpu-api.md
 // ============================================================================
 
 string cpu_vendor();
@@ -163,19 +198,13 @@ int64 perf_time();
 int64 perf_frequency();
 int64 get_tickcount64();
 
-int64 now_millisecond();
+int64  now_millisecond();
 string day_name(int64 dow);
 string month_name(int64 month);
-int64 hour12(int64 hour24);
+int64  hour12(int64 hour24);
 string ampm(int64 hour24);
 
-// Bit-pattern conversions are now done with reinterpret_cast<T>(val):
-//   uint32 bits = reinterpret_cast<uint32>(1.5f);
-//   float32 f   = reinterpret_cast<float32>(0x3FC00000u);
-// The old bits_f32_to_u32 / bits_u32_to_f32 / bits_f64_to_u64 /
-// bits_u64_to_f64 natives have been removed.
-
-bool set_thread_priority(thread_priority p);
+// Bit-pattern conversions: reinterpret_cast / std::bit_cast — no bits_* natives.
 
 enum thread_priority {
     lowest,
@@ -186,11 +215,14 @@ enum thread_priority {
     time_critical,
 }
 
-// ============================================================================
-// 06 - GUI API
-// ============================================================================
+bool set_thread_priority(thread_priority p);
 
-// --- enums ----------------------------------------------------------------
+// ============================================================================
+// GUI API
+// https://docs.perception.cx/perception/gui-api.md
+// Handles are engine-owned int64 wrappers; dtor is noop; unload sweeps.
+// Free functions own std::string / std::vector shapes (type_builder limit).
+// ============================================================================
 
 enum ui_align { left, center, right }
 enum ui_anchor { none, left, right, top, bottom, all }
@@ -200,7 +232,6 @@ enum keybind_mode { off, on, single, toggle, always_on }
 enum toast_kind { info, success, warning, error }
 enum ui_callback { value_changed, item_activated }
 
-// modular_ui color hashes (subset). Used as keys for get_theme_color/set_theme_color.
 enum ui_color {
     bg,
     fg,
@@ -214,19 +245,22 @@ enum ui_color {
     element_button_bg,
 }
 
-// --- widget handle types --------------------------------------------------
+// --- widget handles -------------------------------------------------------
 
 class label_t {
-    void set_text(string s);
+    void set_text(const char* s);
+    void set_text(const string& s);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class button_t {
     void attach_to(button_t other);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -234,7 +268,8 @@ class checkbox_t {
     bool get();
     void set(bool v);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -242,7 +277,8 @@ class slider_t {
     float64 get();
     void set(float64 v);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -250,7 +286,8 @@ class slider_icon_t {
     float64 get();
     void set(float64 v);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -258,7 +295,8 @@ class value_input_t {
     float64 get();
     void set(float64 v);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -266,7 +304,8 @@ class options_t {
     int64 get();
     void set(int64 i);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -274,7 +313,8 @@ class multi_options_t {
     int64 get_mask();
     void set_mask(int64 m);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -282,7 +322,8 @@ class dropdown_t {
     int64 get();
     void set(int64 i);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -290,31 +331,32 @@ class multi_dropdown_t {
     int64 get_mask();
     void set_mask(int64 m);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class list_t {
     int64 get_selected();
     void set_selected(int64 i);
-    void set_items(array<string> info1, array<string> info2);
     int64 size();
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class inline_button_t {
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class inline_text_input_t {
-    string get();
-    void set(string s);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -322,7 +364,8 @@ class tabs_t {
     int64 get();
     void set(int64 i);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -331,20 +374,23 @@ class keybind_t {
     bool is_active();
     int64 binding_count();
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class progress_bar_t {
     void set(float64 v);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class spinner_t {
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -353,31 +399,30 @@ class range_slider_t {
     float64 get_hi();
     void set(float64 lo, float64 hi);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class table_t {
-    void add_row(array<string> cells);
     void clear();
     int64 size();
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class text_input_t {
-    string get();
-    void set(string s);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
 class text_editor_t {
-    string get();
-    void set(string s);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
 
@@ -386,49 +431,91 @@ class colorpicker_t {
     color get();
     void set(color c);
     void set_active(bool active);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void on_change(int64 fn_handle);
 }
+
+// Free-function string/vector shapes (docs: type_builder limit)
+string get(inline_text_input_t w);
+string get(text_input_t w);
+string get(text_editor_t w);
+void set(inline_text_input_t w, const char* s);
+void set(inline_text_input_t w, const string& s);
+void set(text_input_t w, const char* s);
+void set(text_input_t w, const string& s);
+void set(text_editor_t w, const char* s);
+void set(text_editor_t w, const string& s);
+void set_items(list_t w, const vector& info1, const vector& info2);
+void add_row(table_t w, const vector& cells);
 
 // --- sidebar section ------------------------------------------------------
 
 class sidebar_section_t {
     void set_active(bool active);
 
-    label_t           create_label(string text, ui_align align);
-    void              create_separator();
-    button_t          create_button(string label, ui_align align);
-    checkbox_t        create_checkbox(string label, bool initial);
-    slider_t          create_slider(string label, float64 initial, float64 minv, float64 maxv, float64 step);
-    slider_icon_t     create_slider_icon(string icon, float64 initial, float64 minv, float64 maxv, float64 step);
-    value_input_t     create_value_input(string label, float64 initial, float64 minv, float64 maxv, float64 step);
-    options_t         create_options(string label, array<string> items, int64 selected);
-    multi_options_t   create_multi_options(string label, array<string> items, int64 selected_mask);
-    dropdown_t        create_dropdown(string label, array<string> items, int64 selected);
-    multi_dropdown_t  create_multi_dropdown(string label, array<string> items, int64 selected_mask);
-    list_t            create_list(string label, array<string> info1, array<string> info2, bool selectable, int64 selected, int64 visible_rows, bool filterable);
-    inline_button_t   create_inline_button(string label, float64 width, string icon);
-    inline_text_input_t create_inline_text_input(string initial, float64 width, string placeholder);
-    tabs_t            create_tabs(array<string> items, int64 selected);
-    keybind_t         create_keybind(string label);
-    progress_bar_t    create_progress_bar(string label, float64 initial, float64 minv, float64 maxv, bool show_pct);
-    spinner_t         create_spinner(string label);
-    range_slider_t    create_range_slider(string label, float64 minv, float64 maxv, float64 lo, float64 hi, float64 step);
-    table_t           create_table(string label, array<string> col_names, array<float64> col_widths, int64 visible_rows);
-    text_input_t      create_text_input(string label, string initial, int64 max_lines);
-    text_editor_t     create_text_editor(string label, string initial, int64 visible_lines, string lexer);
-    colorpicker_t     create_colorpicker(string label, color initial);
+    // Scalar-arg builders stay as methods
+    label_t             create_label(const char* text, ui_align align);
+    label_t             create_label(const string& text, ui_align align);
+    void                create_separator();
+    button_t            create_button(const char* label, ui_align align);
+    button_t            create_button(const string& label, ui_align align);
+    checkbox_t          create_checkbox(const char* label, bool initial);
+    checkbox_t          create_checkbox(const string& label, bool initial);
+    slider_t            create_slider(const char* label, float64 initial, float64 minv, float64 maxv, float64 step);
+    slider_t            create_slider(const string& label, float64 initial, float64 minv, float64 maxv, float64 step);
+    slider_icon_t       create_slider_icon(const char* icon, float64 initial, float64 minv, float64 maxv, float64 step);
+    slider_icon_t       create_slider_icon(const string& icon, float64 initial, float64 minv, float64 maxv, float64 step);
+    value_input_t       create_value_input(const char* label, float64 initial, float64 minv, float64 maxv, float64 step);
+    value_input_t       create_value_input(const string& label, float64 initial, float64 minv, float64 maxv, float64 step);
+    inline_button_t     create_inline_button(const char* label, float64 width, const char* icon);
+    inline_button_t     create_inline_button(const string& label, float64 width, const string& icon);
+    inline_text_input_t create_inline_text_input(const char* initial, float64 width, const char* placeholder);
+    inline_text_input_t create_inline_text_input(const string& initial, float64 width, const string& placeholder);
+    keybind_t           create_keybind(const char* label);
+    keybind_t           create_keybind(const string& label);
+    progress_bar_t      create_progress_bar(const char* label, float64 initial, float64 minv, float64 maxv, bool show_pct);
+    progress_bar_t      create_progress_bar(const string& label, float64 initial, float64 minv, float64 maxv, bool show_pct);
+    spinner_t           create_spinner(const char* label);
+    spinner_t           create_spinner(const string& label);
+    range_slider_t      create_range_slider(const char* label, float64 minv, float64 maxv, float64 lo, float64 hi, float64 step);
+    range_slider_t      create_range_slider(const string& label, float64 minv, float64 maxv, float64 lo, float64 hi, float64 step);
+    text_input_t        create_text_input(const char* label, const char* initial, int64 max_lines);
+    text_input_t        create_text_input(const string& label, const string& initial, int64 max_lines);
+    text_editor_t       create_text_editor(const char* label, const char* initial, int64 visible_lines, const char* lexer);
+    text_editor_t       create_text_editor(const string& label, const string& initial, int64 visible_lines, const string& lexer);
+    colorpicker_t       create_colorpicker(const char* label, color initial);
+    colorpicker_t       create_colorpicker(const string& label, color initial);
 }
 
-sidebar_section_t create_sidebar_section(string name, string icon);
+// Vector-arg builders are free functions (section first)
+options_t        create_options(sidebar_section_t s, const char* label, const vector& items, int64 selected);
+options_t        create_options(sidebar_section_t s, const string& label, const vector& items, int64 selected);
+multi_options_t  create_multi_options(sidebar_section_t s, const char* label, const vector& items, int64 selected_mask);
+multi_options_t  create_multi_options(sidebar_section_t s, const string& label, const vector& items, int64 selected_mask);
+dropdown_t       create_dropdown(sidebar_section_t s, const char* label, const vector& items, int64 selected);
+dropdown_t       create_dropdown(sidebar_section_t s, const string& label, const vector& items, int64 selected);
+multi_dropdown_t create_multi_dropdown(sidebar_section_t s, const char* label, const vector& items, int64 selected_mask);
+multi_dropdown_t create_multi_dropdown(sidebar_section_t s, const string& label, const vector& items, int64 selected_mask);
+list_t           create_list(sidebar_section_t s, const char* label, const vector& info1, const vector& info2, bool selectable, int64 selected, int64 visible_rows, bool filterable);
+list_t           create_list(sidebar_section_t s, const string& label, const vector& info1, const vector& info2, bool selectable, int64 selected, int64 visible_rows, bool filterable);
+tabs_t           create_tabs(sidebar_section_t s, const vector& items, int64 selected);
+table_t          create_table(sidebar_section_t s, const char* label, const vector& col_names, const vector& col_widths, int64 visible_rows);
+table_t          create_table(sidebar_section_t s, const string& label, const vector& col_names, const vector& col_widths, int64 visible_rows);
+
+sidebar_section_t create_sidebar_section(const char* name, const char* icon);
+sidebar_section_t create_sidebar_section(const string& name, const string& icon);
 void create_sidebar_separator();
 
-// --- frames / layers / custom widgets / file picker ----------------------
+// --- frames / layers / widgets / menus / file picker ----------------------
 
 class layer_t {
     void promote_to_top();
     void set_visible(bool v);
     int64 frame_count();
+    bool register_in_taskbar(const char* label);
+    bool register_in_taskbar(const string& label);
+    void unregister_from_taskbar();
 }
 
 class frame_t {
@@ -450,30 +537,36 @@ class widget_t {
     void set_pos(vec2 pos);
     void set_size(vec2 size);
     void set_active(bool v);
-    void set_tooltip(string s);
+    void set_tooltip(const char* s);
+    void set_tooltip(const string& s);
     void set_float(int64 hash, float64 v);
     void set_anchors(int64 mask);
     void install_hook(int64 hook_id, int64 fn_handle);
     void remove_hook(int64 hook_id);
 }
 
-frame_t create_frame(string name, vec2 pos, vec2 size, layer_t layer);
-frame_t create_default_frame(string name, vec2 pos, vec2 size, layer_t layer);
-frame_t create_draggable_frame(string name, vec2 pos, vec2 size, layer_t layer);
-frame_t create_popup(string name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_frame(const char* name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_frame(const string& name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_default_frame(const char* name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_default_frame(const string& name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_draggable_frame(const char* name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_draggable_frame(const string& name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_popup(const char* name, vec2 pos, vec2 size, layer_t layer);
+frame_t create_popup(const string& name, vec2 pos, vec2 size, layer_t layer);
 frame_t get_focused_frame();
 bool ui_is_focused();
 
-layer_t create_layer(string name, bool input_passthrough, bool force_topmost);
+layer_t create_layer(const char* name, bool input_passthrough, bool force_topmost);
+layer_t create_layer(const string& name, bool input_passthrough, bool force_topmost);
 layer_t get_default_layer();
 int64 layer_count();
 
-widget_t create_widget(frame_t parent, string name, int64 execute_cb_handle, bool consume_input);
-
-// --- menus ---------------------------------------------------------------
+widget_t create_widget(frame_t parent, const char* name, int64 execute_cb_handle, bool consume_input);
+widget_t create_widget(frame_t parent, const string& name, int64 execute_cb_handle, bool consume_input);
 
 class menu_t {
-    void add_item(string label, int64 on_click_cb, string shortcut, string icon);
+    void add_item(const char* label, int64 on_click_cb, const char* shortcut, const char* icon);
+    void add_item(const string& label, int64 on_click_cb, const string& shortcut, const string& icon);
     void add_separator();
     void attach_to_widget(widget_t target);
     void attach_to_button(button_t target);
@@ -502,30 +595,29 @@ class menu_t {
 
 menu_t create_menu();
 
-// --- file picker ---------------------------------------------------------
-
 class file_picker_t {
     void open();
     void close();
-    string get_selected();
 }
 
-file_picker_t create_file_picker(string title, string start_path, string filter_extension, bool folder_mode);
-
-// --- theme + global UI queries -------------------------------------------
+file_picker_t create_file_picker(const char* title, const char* start_path, const char* filter_extension, bool folder_mode);
+file_picker_t create_file_picker(const string& title, const string& start_path, const string& filter_extension, bool folder_mode);
+string get_selected(file_picker_t p);
 
 bool is_dark_theme();
 void set_dark_theme(bool dark);
 color get_theme_color(int64 color_hash);
 void set_theme_color(int64 color_hash, color c);
 
-void show_toast(toast_kind kind, string title, string msg);
+void show_toast(toast_kind kind, const char* title, const char* msg);
+void show_toast(toast_kind kind, const string& title, const string& msg);
 bool gui_active();
 vec2 get_gui_size();
 vec2 get_gui_position();
 
 // ============================================================================
-// 07 - Input API
+// Input API
+// https://docs.perception.cx/perception/input-api.md
 // ============================================================================
 
 vec2 get_mouse_pos();
@@ -533,11 +625,7 @@ vec2 get_mouse_pos_desktop();
 vec2 get_mouse_delta();
 vec2 get_mouse_delta_desktop();
 bool mouse_movement_received();
-
-// Two arities seen in the corpus: typed (vec2 pos, vec2 size) and 4-float.
 bool is_hovered(vec2 pos, vec2 size);
-bool is_hovered(float64 x, float64 y, float64 w, float64 h);
-
 float64 get_scroll_delta();
 
 bool key_down(int64 vk);
@@ -557,11 +645,11 @@ class key_state_t {
 }
 
 key_state_t get_key_state(int64 vk);
-array<int32> get_keys_down();
+vector get_keys_down();
 string get_recent_key_input();
 string get_key_name(int64 vk);
 
-// Win32 virtual-key codes. Values match VK_* spec.
+// Win32 virtual-key codes (VK_*).
 enum vk {
     lbutton = 0x01,
     rbutton = 0x02,
@@ -613,114 +701,127 @@ enum vk {
 }
 
 // ============================================================================
-// 08 - Net API
+// Net API  (gated: network_access)
+// https://docs.perception.cx/perception/net-api.md
+// Free functions own string/vector shapes.
 // ============================================================================
 
 class http_response_t {
     int64 status();
-    string body();
     bool ok();
 }
 
-http_response_t http_get(string url, int64 timeout_ms);
-http_response_t http_get(string url, map<string, string> headers, int64 timeout_ms);
-http_response_t http_post(string url, string content_type, string body, int64 timeout_ms);
-http_response_t http_post(string url, string content_type, string body, map<string, string> headers, int64 timeout_ms);
+string body(http_response_t r);
+
+http_response_t http_get(const char* url, int64 timeout_ms);
+http_response_t http_get(const string& url, int64 timeout_ms);
+http_response_t http_get(const char* url, unordered_map& headers, int64 timeout_ms);
+http_response_t http_get(const string& url, unordered_map& headers, int64 timeout_ms);
+http_response_t http_post(const char* url, const char* content_type, const char* body, int64 timeout_ms);
+http_response_t http_post(const string& url, const string& content_type, const string& body, int64 timeout_ms);
+http_response_t http_post(const char* url, const char* content_type, const char* body, unordered_map& headers, int64 timeout_ms);
+http_response_t http_post(const string& url, const string& content_type, const string& body, unordered_map& headers, int64 timeout_ms);
 
 class ws_message_t {
     bool ok();
     bool is_text();
     bool is_closed();
-    string payload();
 }
+
+string payload(ws_message_t m);
 
 class ws_t {
     bool is_open();
-    bool send_text(string msg);
-    bool send_binary(array<uint8> data);
     ws_message_t recv();
     ws_message_t poll();
     void close(int64 code);
 }
 
-ws_t ws_connect(string url, int64 timeout_ms);
+bool send_text(ws_t ws, const char* msg);
+bool send_text(ws_t ws, const string& msg);
+bool send_binary(ws_t ws, const vector& data);
+
+ws_t ws_connect(const char* url, int64 timeout_ms);
+ws_t ws_connect(const string& url, int64 timeout_ms);
 
 class udp_t {
-    bool bind(string addr, int64 port);
-    bool send_to(array<uint8> data, string addr, int64 port);
-    array<uint8> recv(int64 timeout_ms);
-    string last_sender_addr();
     int64 last_sender_port();
     void close();
 }
 
+bool bind(udp_t u, const char* addr, int64 port);
+bool bind(udp_t u, const string& addr, int64 port);
+bool send_to(udp_t u, const vector& data, const char* addr, int64 port);
+bool send_to(udp_t u, const vector& data, const string& addr, int64 port);
+vector recv(udp_t u, int64 timeout_ms);
+string last_sender_addr(udp_t u);
+
 udp_t udp_create();
 
 // ============================================================================
-// 09 - Render API
+// Render API  (namespace render in docs; bare names also accepted)
+// https://docs.perception.cx/perception/render-api.md
 // ============================================================================
 
-// `color` is now shipped as a source-level module — `import "color";` gives
-// a [[packed]] 4-byte struct with direct field access (`c.r` etc.). The class
-// declaration below covers the legacy typereg fallback used when scripts skip
-// the import; the method-form accessors (`c.r()`) remain valid in both paths.
+// color is auto-imported (packed rgba). Method accessors kept for corpus.
 class color {
+    uint8 r;
+    uint8 g;
+    uint8 b;
+    uint8 a;
     int64 r();
     int64 g();
     int64 b();
     int64 a();
-    // legacy aliases also seen in the wild:
-    int64 x();
-    int64 y();
-    int64 z();
-    int64 w();
-    // copy with a different alpha channel (returns a fresh color).
     color with_alpha(uint8 _a);
 }
 
 color color(int64 r, int64 g, int64 b, int64 a);
 
-// 2D primitives
-int64 draw_rect(vec2 pos, vec2 size, color c, float64 thickness, float64 rounding, uint8 rounding_flags);
-int64 draw_rect_filled(vec2 pos, vec2 size, color c, float64 rounding, uint8 rounding_flags);
-int64 draw_line(vec2 a, vec2 b, color c, float64 thickness);
-int64 draw_circle(vec2 center, float64 radius, color c, float64 thickness, bool filled);
-int64 draw_arc(vec2 center, vec2 radii, float64 start_deg, float64 sweep_deg, color c, float64 thickness, bool filled);
-int64 draw_triangle(vec2 a, vec2 b, vec2 c, color col, float64 thickness, bool filled);
-int64 draw_four_corner_gradient(vec2 pos, vec2 size, color tl, color tr, color bl, color br, float64 rounding);
-int64 draw_polygon(array xy_pairs, uint32 count_pairs, color c, float64 thickness, bool filled);
-int64 draw_bitmap(int64 bmp, vec2 pos, vec2 size, color tint, bool rounded);
-int64 draw_text(string text, vec2 pos, color c, int64 font, int32 effect, color effect_color, float64 effect_amount);
+void draw_rect(vec2 pos, vec2 size, color c, float64 thickness, float64 rounding, uint8 rounding_flags);
+void draw_rect_filled(vec2 pos, vec2 size, color c, float64 rounding, uint8 rounding_flags);
+void draw_line(vec2 a, vec2 b, color c, float64 thickness);
+void draw_circle(vec2 center, float64 radius, color c, float64 thickness, bool filled);
+void draw_arc(vec2 center, vec2 radii, float64 start_deg, float64 sweep_deg, color c, float64 thickness, bool filled);
+void draw_triangle(vec2 a, vec2 b, vec2 c, color col, float64 thickness, bool filled);
+void draw_four_corner_gradient(vec2 pos, vec2 size, color tl, color tr, color bl, color br, float64 rounding);
+void draw_polygon(const vector& xy_pairs, uint32 count_pairs, color c, float64 thickness, bool filled);
+void draw_bitmap(int64 bmp, vec2 pos, vec2 size, color tint, bool rounded);
+void draw_text(const char* text, vec2 pos, color c, int64 font, int32 effect, color effect_color, float64 effect_amount);
+void draw_text(const string& text, vec2 pos, color c, int64 font, int32 effect, color effect_color, float64 effect_amount);
 
-// Text and fonts
-float64 get_text_width(int64 font, string text, int32 maxw, int32 maxh);
-float64 get_text_height(int64 font, string text, int32 maxw, int32 maxh);
+float64 get_text_width(int64 font, const char* text, int32 maxw, int32 maxh);
+float64 get_text_width(int64 font, const string& text, int32 maxw, int32 maxh);
+float64 get_text_height(int64 font, const char* text, int32 maxw, int32 maxh);
+float64 get_text_height(int64 font, const string& text, int32 maxw, int32 maxh);
 int32 get_char_advance(int64 font, uint32 wchar32);
-int64 create_font(string path, float64 size, bool antialias, bool load_color, array glyph_ranges);
-int64 create_font_mem(string label, float64 size, array buf, bool antialias, bool load_color, array glyph_ranges);
-int64 create_bitmap(array data);
+
+int64 create_font(const char* path, float64 size, bool antialias, bool load_color, const vector& glyph_ranges);
+int64 create_font(const string& path, float64 size, bool antialias, bool load_color, const vector& glyph_ranges);
+int64 create_font_mem(const char* label, float64 size, const vector& buf, bool antialias, bool load_color, const vector& glyph_ranges);
+int64 create_font_mem(const string& label, float64 size, const vector& buf, bool antialias, bool load_color, const vector& glyph_ranges);
+int64 create_bitmap(const vector& data);
 int64 get_font18();
 int64 get_font20();
 int64 get_font24();
 int64 get_font28();
 
-// Clipping
-int64 clip_push(vec2 pos, vec2 size);
-int64 clip_pop();
+void clip_push(vec2 pos, vec2 size);
+void clip_pop();
 
-// Viewport
 float64 get_view_width();
 float64 get_view_height();
 float64 get_view_scale();
 float64 get_fps();
 
-// Shaders
-int64 create_shader(string vs_source, string ps_source, string layout);
+// Shaders / buffers / pipeline
+int64 create_shader(const char* vs_source, const char* ps_source, const char* layout);
+int64 create_shader(const string& vs_source, const string& ps_source, const string& layout);
 int64 destroy_shader(int64 shader);
-int64 create_compute_shader(string cs_source);
+int64 create_compute_shader(const char* cs_source);
+int64 create_compute_shader(const string& cs_source);
 int64 destroy_compute_shader(int64 cs);
 
-// Buffers
 int64 create_vertex_buffer(uint32 stride, uint32 max_vertices, bool dynamic);
 int64 destroy_vertex_buffer(int64 vb);
 int64 create_index_buffer(uint32 max_indices, bool use_32bit, bool dynamic);
@@ -730,7 +831,6 @@ int64 destroy_constant_buffer(int64 cb);
 int64 create_structured_buffer(uint32 element_size, uint32 element_count, bool cpu_write, bool gpu_write);
 int64 destroy_structured_buffer(int64 sb);
 
-// Pipeline state
 int64 create_blend_state(int32 src, int32 dst, int32 op, int32 src_alpha, int32 dst_alpha, int32 op_alpha);
 int64 destroy_blend_state(int64 bs);
 int64 create_sampler(int32 filter, int32 address_u, int32 address_v);
@@ -740,22 +840,22 @@ int64 destroy_depth_stencil_state(int64 ds);
 int64 create_rasterizer_state(int32 cull_mode, int32 fill_mode, bool scissor_enable);
 int64 destroy_rasterizer_state(int64 rs);
 
-// Render targets and textures
 int64 create_render_target(uint32 width, uint32 height);
 int64 destroy_render_target(int64 rt);
 int64 create_depth_buffer(uint32 width, uint32 height);
 int64 destroy_depth_buffer(int64 db);
-int64 create_texture(uint32 width, uint32 height, array rgba_data);
+int64 create_texture(uint32 width, uint32 height, const vector& rgba_data);
 int64 destroy_texture(int64 tex);
-int64 load_texture(string path);
-int64 load_texture_mem(array data);
+int64 load_texture(const char* path);
+int64 load_texture(const string& path);
+int64 load_texture_mem(const vector& data);
 float64 get_texture_width(int64 tex);
 float64 get_texture_height(int64 tex);
 
-// Meshes
-int64 create_mesh_raw(array vertex_data, uint32 vertex_count, uint32 stride, array index_data, uint32 index_count, bool use_32bit);
-int64 load_mesh(string path);
-int64 load_mesh_mem(array data);
+int64 create_mesh_raw(const vector& vertex_data, uint32 vertex_count, uint32 stride, const vector& index_data, uint32 index_count, bool use_32bit);
+int64 load_mesh(const char* path);
+int64 load_mesh(const string& path);
+int64 load_mesh_mem(const vector& data);
 int64 destroy_mesh(int64 mesh);
 int64 get_mesh_vert_count(int64 mesh);
 int64 get_mesh_index_count(int64 mesh);
@@ -767,20 +867,12 @@ float64 get_mesh_bounds_max_x(int64 mesh);
 float64 get_mesh_bounds_max_y(int64 mesh);
 float64 get_mesh_bounds_max_z(int64 mesh);
 
-// Custom draw
-int64 custom_draw(int64 shader, int64 vb, array vertex_data, uint32 vertex_count, int32 topology,
-                  int64 blend, int64 sampler, int64 texture, int32 tex_slot,
-                  int64 cb, array cb_data, int32 cb_slot);
-int64 custom_draw_indexed(int64 shader, int64 vb, array vertex_data, uint32 vertex_count,
-                          int64 ib, array index_data, uint32 index_count, int32 topology,
-                          int64 blend, int64 sampler, int64 texture, int32 tex_slot,
-                          int64 cb, array cb_data, int32 cb_slot);
-int64 draw_mesh(int64 mesh, int64 shader, int32 topology,
-                int64 blend, int64 sampler, int64 texture, int32 tex_slot,
-                int64 cb, array cb_data, int32 cb_slot);
+// Custom draw — float32 and uint8 buffer overloads
+void custom_draw(int64 shader, int64 vb, const vector& vertex_data, uint32 vertex_count, int32 topology, int64 blend, int64 sampler, int64 texture, int32 tex_slot, int64 cb, const vector& cb_data, int32 cb_slot);
+void custom_draw_indexed(int64 shader, int64 vb, const vector& vertex_data, uint32 vertex_count, int64 ib, const vector& index_data, uint32 index_count, int32 topology, int64 blend, int64 sampler, int64 texture, int32 tex_slot, int64 cb, const vector& cb_data, int32 cb_slot);
+void draw_mesh(int64 mesh, int64 shader, int32 topology, int64 blend, int64 sampler, int64 texture, int32 tex_slot, int64 cb, const vector& cb_data, int32 cb_slot);
 int64 dispatch_compute(int64 cs, uint32 x, uint32 y, uint32 z);
 
-// Binding and state
 int64 custom_set_render_target(int64 rt);
 int64 custom_set_render_target_ext(int64 rt, int64 depth_buffer);
 int64 custom_reset_render_target();
@@ -791,16 +883,17 @@ int64 custom_set_rasterizer_state(int64 rs);
 int64 custom_set_viewport(float64 x, float64 y, float64 w, float64 h);
 int64 custom_reset_viewport();
 int64 custom_bind_texture(int64 texture, int64 sampler, int32 slot);
-int64 custom_bind_constant_buffer(int64 cb, array data, int32 slot, int32 stage);
-int64 custom_update_texture(int64 tex, uint32 x, uint32 y, uint32 w, uint32 h, array rgba_data);
+int64 custom_bind_constant_buffer(int64 cb, const vector& data, int32 slot, int32 stage);
+int64 custom_update_texture(int64 tex, uint32 x, uint32 y, uint32 w, uint32 h, const vector& rgba_data);
 int64 custom_clear_render_target(int64 rt, float64 r, float64 g, float64 b, float64 a);
 int64 custom_clear_depth_buffer(int64 db);
 int64 bind_structured_buffer(int64 sb, int32 slot, int32 stage);
-int64 update_structured_buffer(int64 sb, array data);
+int64 update_structured_buffer(int64 sb, const vector& data);
 int64 capture_backbuffer(int32 slot);
 
 // ============================================================================
-// 10 - Sound API
+// Sound API
+// https://docs.perception.cx/perception/sound-api.md
 // ============================================================================
 
 class sound_inst_t {
@@ -814,39 +907,15 @@ class sound_t {
     sound_inst_t play(float64 volume, float64 pan, bool loop);
 }
 
-sound_t load_sound(string relative_path);
+sound_t load_sound(const char* relative_path);
+sound_t load_sound(const string& relative_path);
 void stop_all_sounds();
 
 // ============================================================================
-// 11 - Unicorn API
+// Unicorn API
+// https://docs.perception.cx/perception/unicorn-api.md
+// mem_read/write + SIMD regs are free functions taking cpu_t.
 // ============================================================================
-
-class cpu_t {
-    bool mem_map(int64 addr, int64 size, uc_prot perms);
-    bool mem_write(int64 addr, array<uint8> bytes);
-    array<uint8> mem_read(int64 addr, int64 size);
-
-    bool reg_write64(uc_reg reg, int64 value);
-    int64 reg_read64(uc_reg reg);
-    bool reg_write128(uc_reg reg, array<uint8> bytes);
-    array<uint8> reg_read128(uc_reg reg);
-    bool reg_write256(uc_reg reg, array<uint8> bytes);
-    array<uint8> reg_read256(uc_reg reg);
-
-    int64 start(int64 begin, int64 end, int64 timeout, int64 count);
-    void emu_stop();
-    bool flush_code();
-    bool setup_stack(int64 base, int64 size, int64 stop_addr);
-
-    bool hook_add(uc_hook hook_kind, int64 fn_handle);
-
-    int64 get_last_exception();
-    int64 get_exception_address();
-}
-
-cpu_t cpu_create();
-cpu_t cpu_create_process(proc_t proc, bool allow_writes);
-cpu_t cpu_active();
 
 enum uc_reg {
     rax, rbx, rcx, rdx, rsi, rdi, rbp, rsp,
@@ -879,22 +948,51 @@ enum uc_hook {
     intr = 5,
 }
 
+class cpu_t {
+    bool mem_map(int64 addr, int64 size, uc_prot perms);
+    bool reg_write64(uc_reg reg, int64 value);
+    int64 reg_read64(uc_reg reg);
+    int64 start(int64 begin, int64 end, int64 timeout, int64 count);
+    void emu_stop();
+    bool flush_code();
+    bool setup_stack(int64 base, int64 size, int64 stop_addr);
+    bool hook_add(uc_hook hook_kind, int64 fn_handle);
+    int64 get_last_exception();
+    int64 get_exception_address();
+}
+
+bool mem_write(cpu_t cpu, int64 addr, const vector& bytes);
+vector mem_read(cpu_t cpu, int64 addr, int64 size);
+bool reg_write128(cpu_t cpu, uc_reg reg, const vector& bytes);
+vector reg_read128(cpu_t cpu, uc_reg reg);
+bool reg_write256(cpu_t cpu, uc_reg reg, const vector& bytes);
+vector reg_read256(cpu_t cpu, uc_reg reg);
+
+cpu_t cpu_create();
+cpu_t cpu_create_process(proc_t proc, bool allow_writes);
+cpu_t cpu_active();
+
 // ============================================================================
-// 12 - Win API
+// Win API
+// https://docs.perception.cx/perception/win-api.md
+// String fields of window_info_t are free functions.
 // ============================================================================
 
 class window_info_t {
     int64 hwnd();
     int64 pid();
     int64 tid();
-    string process_name();
-    string title();
-    string class_name();
 }
 
-array<window_info_t> get_all_hwnds();
-int64 find_window(string title);
-int64 find_window(string title, string class_name);
+string process_name(window_info_t info);
+string title(window_info_t info);
+string class_name(window_info_t info);
+
+vector get_all_hwnds();
+int64 find_window(const char* title);
+int64 find_window(const string& title);
+int64 find_window(const char* title, const char* class_name);
+int64 find_window(const string& title, const string& class_name);
 
 int64 get_window_width(int64 hwnd);
 int64 get_window_height(int64 hwnd);
@@ -909,13 +1007,15 @@ int64 get_window_thread_id(int64 hwnd);
 int64 get_window_process_id(int64 hwnd);
 bool post_message(int64 hwnd, int64 msg, int64 wparam, int64 lparam);
 
-bool copy_to_clipboard(string text);
+bool copy_to_clipboard(const char* text);
+bool copy_to_clipboard(const string& text);
 string copy_from_clipboard();
 
 void win_key_down(int64 vk);
 void win_key_up(int64 vk);
 void win_key_press(int64 vk, int64 delay_ms);
-bool send_char(int64 hwnd, string text);
+bool send_char(int64 hwnd, const char* text);
+bool send_char(int64 hwnd, const string& text);
 bool send_key(int64 hwnd, int64 vk);
 
 void mouse_move(int64 x, int64 y);
@@ -927,52 +1027,9 @@ void mouse_scroll(int64 amount);
 void send_mouse_input(int64 dx, int64 dy, int64 flags, int64 mouse_data);
 
 // ============================================================================
-// 13 - Zydis API
+// Zydis API
+// https://docs.perception.cx/perception/zydis-api.md
 // ============================================================================
-
-class zydis_req_t {
-    void set_mnemonic(int64 mnemonic);
-    void set_machine_mode(zydis_machine_mode mode);
-    void set_operand_count(int64 count);
-    void set_branch_type(zydis_branch_type type);
-    void set_branch_width(zydis_branch_width width);
-    void set_operand_reg(int64 idx, int64 reg);
-    void set_operand_imm(int64 idx, int64 imm);
-    void set_operand_mem(int64 idx, int64 base, int64 idx_reg, int64 scale, int64 disp, int64 size);
-    void set_operand_ptr(int64 idx, int64 segment, int64 offset);
-    int64 get_mnemonic();
-    zydis_machine_mode get_machine_mode();
-    int64 get_operand_count();
-}
-
-class zydis_builder_t {
-    void set_machine_mode(zydis_machine_mode mode);
-    void set_base_address(int64 addr);
-    void clear();
-    void push(zydis_req_t req);
-    void push_bytes(array<uint8> bytes);
-    void push_byte(uint8 b);
-    void push_u16(uint16 v);
-    void push_u32(uint32 v);
-    void push_u64(uint64 v);
-    void push_nop(int64 count);
-    void push_int3();
-    void push_ret();
-    array<uint8> build();
-    int64 get_count();
-}
-
-array<uint8> zydis_encode(zydis_req_t req);
-array<uint8> zydis_encode_absolute(zydis_req_t req, int64 runtime_rip);
-array<uint8> zydis_nop_fill(int64 length);
-zydis_req_t zydis_decoded_to_request(array<uint8> bytes, int64 runtime_rip);
-
-int64 zydis_mnemonic_from_string(string name);
-string zydis_mnemonic_to_string(int64 mnemonic);
-int64 zydis_register_from_string(string name);
-string zydis_register_to_string(int64 reg);
-
-array<string> zydis_disasm(array<uint8> bytes, int64 runtime_rip);
 
 enum zydis_machine_mode {
     long_64,
@@ -998,33 +1055,92 @@ enum zydis_branch_width {
     w64,
 }
 
+class zydis_req_t {
+    void set_mnemonic(int64 mnemonic);
+    void set_machine_mode(zydis_machine_mode mode);
+    void set_operand_count(int64 count);
+    void set_branch_type(zydis_branch_type type);
+    void set_branch_width(zydis_branch_width width);
+    void set_operand_reg(int64 idx, int64 reg);
+    void set_operand_imm(int64 idx, int64 imm);
+    void set_operand_mem(int64 idx, int64 base, int64 idx_reg, int64 scale, int64 disp, int64 size);
+    void set_operand_ptr(int64 idx, int64 segment, int64 offset);
+    int64 get_mnemonic();
+    zydis_machine_mode get_machine_mode();
+    int64 get_operand_count();
+}
+
+class zydis_builder_t {
+    void set_machine_mode(zydis_machine_mode mode);
+    void set_base_address(int64 addr);
+    void clear();
+    void push(zydis_req_t req);
+    void push_byte(uint8 b);
+    void push_u16(uint16 v);
+    void push_u32(uint32 v);
+    void push_u64(uint64 v);
+    void push_nop(int64 count);
+    void push_int3();
+    void push_ret();
+    int64 get_count();
+}
+
+void push_bytes(zydis_builder_t b, const vector& bytes);
+vector zydis_builder_build(zydis_builder_t b);
+
+vector zydis_encode(zydis_req_t req);
+vector zydis_encode_absolute(zydis_req_t req, int64 runtime_rip);
+vector zydis_nop_fill(int64 length);
+zydis_req_t zydis_decoded_to_request(const vector& bytes, int64 runtime_rip);
+
+int64 zydis_mnemonic_from_string(const char* name);
+int64 zydis_mnemonic_from_string(const string& name);
+string zydis_mnemonic_to_string(int64 mnemonic);
+int64 zydis_register_from_string(const char* name);
+int64 zydis_register_from_string(const string& name);
+string zydis_register_to_string(int64 reg);
+
+vector zydis_disasm(const vector& bytes, int64 runtime_rip);
+
 // ============================================================================
-// Filesystem API (sandboxed; from test_filesystem_api.em)
+// Filesystem helpers (std file addon / host sandboxed paths — PERM_FILE)
+// Kept for corpus scripts; prefer std file addon APIs when available.
 // ============================================================================
 
-bool fs_create_file(string path, string content);
-bool fs_write_file(string path, string content);
-bool fs_append_file(string path, string content);
-string fs_read_file(string path);
-bool fs_delete_file(string path);
-bool fs_file_exists(string path);
-int64 fs_file_size(string path);
+bool fs_create_file(const char* path, const char* content);
+bool fs_create_file(const string& path, const string& content);
+bool fs_write_file(const char* path, const char* content);
+bool fs_write_file(const string& path, const string& content);
+bool fs_append_file(const char* path, const char* content);
+bool fs_append_file(const string& path, const string& content);
+string fs_read_file(const char* path);
+string fs_read_file(const string& path);
+bool fs_delete_file(const char* path);
+bool fs_delete_file(const string& path);
+bool fs_file_exists(const char* path);
+bool fs_file_exists(const string& path);
+int64 fs_file_size(const char* path);
+int64 fs_file_size(const string& path);
+bool fs_create_directory(const char* path);
+bool fs_create_directory(const string& path);
+bool fs_delete_directory(const char* path);
+bool fs_delete_directory(const string& path);
+bool fs_dir_exists(const char* path);
+bool fs_dir_exists(const string& path);
+vector fs_list_files(const char* path);
+vector fs_list_files(const string& path);
+vector fs_list_dirs(const char* path);
+vector fs_list_dirs(const string& path);
+vector fs_list_all(const char* path);
+vector fs_list_all(const string& path);
+bool fs_write_file_binary(const char* path, const vector& data);
+bool fs_write_file_binary(const string& path, const vector& data);
+bool fs_append_file_binary(const char* path, const vector& data);
+bool fs_append_file_binary(const string& path, const vector& data);
+vector fs_read_file_binary(const char* path);
+vector fs_read_file_binary(const string& path);
 
-bool fs_create_directory(string path);
-bool fs_delete_directory(string path);
-bool fs_dir_exists(string path);
-array<string> fs_list_files(string path);
-array<string> fs_list_dirs(string path);
-array<string> fs_list_all(string path);
-
-bool fs_write_file_binary(string path, array<uint8> data);
-bool fs_append_file_binary(string path, array<uint8> data);
-array<uint8> fs_read_file_binary(string path);
-
-// ============================================================================
-// URL helpers (from corpus usage)
-// ============================================================================
-
-string url_encode(string s);
-string url_decode(string s);
-
+string url_encode(const char* s);
+string url_encode(const string& s);
+string url_decode(const char* s);
+string url_decode(const string& s);

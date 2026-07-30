@@ -250,7 +250,19 @@ async function cmdInitProject(): Promise<void> {
 
     const mainPath = path.join(sourceDir, 'main.em');
     if (!fs.existsSync(mainPath)) {
-        fs.writeFileSync(mainPath, `// Enma entry — edit this file.\nvoid main() {\n}\n`, 'utf8');
+        fs.writeFileSync(
+            mainPath,
+            [
+                '// Perception Enma entry — https://docs.perception.cx/perception/lifecycle-and-routines.md',
+                'int64 main()',
+                '{',
+                '    // return > 0 to stay loaded; <= 0 unloads after main',
+                '    return 1;',
+                '}',
+                '',
+            ].join('\n'),
+            'utf8',
+        );
     }
     const tasksPath = path.join(vscodeDir, 'tasks.json');
     if (!fs.existsSync(tasksPath)) {

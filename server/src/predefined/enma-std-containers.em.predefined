@@ -1,0 +1,166 @@
+// Modern Enma std containers — docs.perception.cx/perception/enma-lang/addons/std-library.md
+// (2026-07-28 contract). Loaded alongside the legacy enma-stdlib snapshot.
+//
+// Notes for the LSP:
+// - Bare `string` / `wstring` remain tokenizer primitives (see builtinType.ts).
+//   With `using namespace std;` scripts also spell them as std::string / std::wstring.
+// - `vector` / `map` / `unordered_map` / `optional` / `pair` / `list` / `stack` /
+//   `queue` match the current prelude. Legacy non-template `array` / `map` /
+//   `list` symbols from enma-stdlib.em.predefined stay for older scripts.
+// - operator[] is not expressible in .em.predefined yet (parser gap); use at().
+
+namespace std {
+
+template<typename T>
+class vector {
+    vector();
+    vector(const vector& other);
+    int64 size();
+    int64 length();
+    int64 capacity();
+    int64 max_size();
+    bool empty();
+    T at(int64 index);
+    T front();
+    T back();
+    void reserve(int64 n);
+    void resize(int64 n);
+    void push_back(T value);
+    void pop_back();
+    void clear();
+}
+
+template<typename T>
+class list {
+    list();
+    list(const list& other);
+    int64 size();
+    bool empty();
+    T front();
+    T back();
+    void push_back(T value);
+    void push_front(T value);
+    void pop_back();
+    void pop_front();
+    void clear();
+    void reverse();
+}
+
+template<typename T>
+class stack {
+    int64 size();
+    bool empty();
+    void push(T value);
+    void pop();
+    T top();
+}
+
+template<typename T>
+class queue {
+    int64 size();
+    bool empty();
+    void push(T value);
+    void pop();
+    T front();
+    T back();
+}
+
+template<typename K, typename V>
+class pair {
+    K first;
+    V second;
+}
+
+template<typename K, typename V>
+class map {
+    map();
+    map(const map& other);
+    int64 size();
+    bool empty();
+    V at(K key);
+    void insert(K key, V value);
+    bool contains(K key);
+    bool erase(K key);
+    void clear();
+}
+
+template<typename K, typename V>
+class unordered_map {
+    unordered_map();
+    unordered_map(const unordered_map& other);
+    int64 size();
+    bool empty();
+    V at(K key);
+    void insert(K key, V value);
+    bool contains(K key);
+    bool erase(K key);
+    void clear();
+    void reserve(int64 n);
+}
+
+template<typename T>
+class optional {
+    optional();
+    bool has_value();
+    T value();
+    void reset();
+}
+
+// Free algorithms (subset — full surface lives in the language docs).
+template<typename T>
+void sort(vector& v);
+
+template<typename T>
+void reverse(vector& v);
+
+int64 npos = -1;
+
+} // namespace std
+
+// Bare names (equivalent to `using namespace std;` for containers).
+// string/wstring stay primitives; vector/map/etc. resolve here for completion.
+template<typename T>
+class vector {
+    vector();
+    vector(const vector& other);
+    int64 size();
+    int64 length();
+    int64 capacity();
+    int64 max_size();
+    bool empty();
+    T at(int64 index);
+    T front();
+    T back();
+    void reserve(int64 n);
+    void resize(int64 n);
+    void push_back(T value);
+    void pop_back();
+    void clear();
+}
+
+template<typename K, typename V>
+class unordered_map {
+    unordered_map();
+    int64 size();
+    bool empty();
+    V at(K key);
+    void insert(K key, V value);
+    bool contains(K key);
+    bool erase(K key);
+    void clear();
+    void reserve(int64 n);
+}
+
+// Common free helpers from the std prelude / core addon.
+string to_string(int64 v);
+string to_string(uint64 v);
+string to_string(float32 v);
+string to_string(float64 v);
+string to_string(bool v);
+wstring wstring_from_str(const string& s);
+string wstring_to_str(const wstring& w);
+void print(const string& s);
+void print(const char* s);
+void println(const string& s);
+void println(const char* s);
+string format(const string& fmt);
