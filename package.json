@@ -34,7 +34,13 @@
     "perception.cx",
     "lsp",
     "language-server",
-    ".em"
+    ".em",
+    "mcp",
+    "debugger",
+    "bundler",
+    "zydis",
+    "unicorn",
+    "aob"
   ],
   "workspaces": [
     "client",
@@ -196,6 +202,56 @@
         "command": "enma.openDocsPanel",
         "title": "Open Docs Panel (Offline)",
         "category": "Enma"
+      },
+      {
+        "command": "enma.validateScript",
+        "title": "Validate Script (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.getContext",
+        "title": "Get Engine Context (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.reconnectMcp",
+        "title": "Reconnect MCP",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.openMcpSettings",
+        "title": "MCP Settings",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.mcpStatusMenu",
+        "title": "MCP Status Menu",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.aobSearch",
+        "title": "AOB / Pattern Search (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.disassemble",
+        "title": "Disassemble (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.lookupSymbol",
+        "title": "Lookup Symbol (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.listExports",
+        "title": "List Module Exports (MCP)",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.inspectEmb",
+        "title": "Inspect .emb Binary Module",
+        "category": "Enma"
       }
     ],
     "keybindings": [
@@ -209,6 +265,18 @@
         "command": "enma.bundleStripped",
         "key": "ctrl+alt+shift+b",
         "mac": "cmd+alt+shift+b",
+        "when": "resourceExtname == .em"
+      },
+      {
+        "command": "enma.runScript",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
+        "when": "resourceExtname == .em"
+      },
+      {
+        "command": "enma.validateScript",
+        "key": "ctrl+alt+v",
+        "mac": "cmd+alt+v",
         "when": "resourceExtname == .em"
       }
     ],
@@ -530,12 +598,12 @@
         "enma.mcp.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Talk to a Perception engine MCP server (https://docs.perception.cx/perception/enma/mcp-api). Required for engine-side validation (on-save script/validate) and `Enma: Run Script (MCP)`."
+          "description": "Talk to a Perception engine MCP server (https://docs.perception.cx/perception/mcp-api.md). Enables on-save script/validate, Run Script (script/execute), Get Context, and reverse-engineering tools."
         },
         "enma.mcp.endpoint": {
           "type": "string",
           "default": "http://127.0.0.1:9077/mcp",
-          "description": "URL of the engine MCP server. HTTP/1.1 streamable JSON-RPC."
+          "description": "HTTP endpoint of the Perception MCP server (default http://127.0.0.1:9077/mcp)."
         },
         "enma.mcp.timeoutMs": {
           "type": "number",
@@ -609,7 +677,34 @@
           ]
         }
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "enma.runScript",
+          "when": "resourceLangId == enma",
+          "group": "navigation@1"
+        },
+        {
+          "command": "enma.validateScript",
+          "when": "resourceLangId == enma",
+          "group": "navigation@2"
+        },
+        {
+          "command": "enma.bundle",
+          "when": "resourceLangId == enma",
+          "group": "navigation@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "enma.inspectEmb",
+          "when": "resourceExtname == .emb",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": []
+    }
   },
   "scripts": {
     "compile": "tsc -b && npm run copy-predefined && node esbuild.config.mjs",

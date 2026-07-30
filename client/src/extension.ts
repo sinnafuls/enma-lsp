@@ -13,6 +13,8 @@ import {
     StatusBarItem,
     ThemeColor,
     TextEditor,
+    QuickPickItemKind,
+    QuickPickItem,
 } from 'vscode';
 
 import {
@@ -173,10 +175,19 @@ function setupStatusBar(context: ExtensionContext): void {
     updateVisibility(window.activeTextEditor);
 }
 
+type MenuEntry = QuickPickItem & { command?: string };
+
+function sep(label: string): MenuEntry {
+    return { label, kind: QuickPickItemKind.Separator };
+}
+
 async function showStatusBarMenu(): Promise<void> {
     const projects = getProjects();
-    const items: { label: string; detail: string; command: string }[] = [];
+    const mcpOn = workspace.getConfiguration('enma.mcp').get<boolean>('enabled', false);
+    const items: MenuEntry[] = [];
 
+    // ── Bundle (angel core) ──────────────────────────────────────────────
+    items.push(sep('Bundle'));
     if (projects.length > 0) {
         items.push(
             {
@@ -191,7 +202,6 @@ async function showStatusBarMenu(): Promise<void> {
             },
         );
     }
-
     items.push(
         { label: '$(package) Bundle Script', detail: 'Ctrl+Alt+B', command: 'enma.bundle' },
         {
@@ -204,6 +214,110 @@ async function showStatusBarMenu(): Promise<void> {
             detail: 'Scaffold tasks.json + source/main.em',
             command: 'enma.initProject',
         },
+        {
+            label: '$(file-code) Scaffold From Template…',
+            detail: 'perception-minimal / multi',
+            command: 'enma.template.scaffold',
+        },
+        {
+            label: '$(github-action) Generate CI Workflow',
+            detail: '.github/workflows/enma.yml',
+            command: 'enma.template.ci',
+        },
+    );
+
+    // ── Engine MCP (Enma-only — Perception host bridge) ───────────────────
+    items.push(sep(`Engine MCP ${mcpOn ? '(on)' : '(off)'}`));
+    items.push(
+        {
+            label: '$(play) Run Script',
+            detail: 'script/execute — Ctrl+Alt+R',
+            description: mcpOn ? 'ready' : 'enable MCP',
+            command: 'enma.runScript',
+        },
+        {
+            label: '$(check) Validate Script',
+            detail: 'script/validate now (also on-save when enabled)',
+            command: 'enma.validateScript',
+        },
+        {
+            label: '$(symbol-namespace) Get Engine Context',
+            detail: 'script/get_context — live host declarations',
+            command: 'enma.getContext',
+        },
+        {
+            label: '$(debug-disconnect) Reconnect MCP',
+            detail: 'Re-probe endpoint + refresh status',
+            command: 'enma.reconnectMcp',
+        },
+        {
+            label: '$(settings-gear) MCP Settings',
+            detail: 'enma.mcp.*',
+            command: 'enma.openMcpSettings',
+        },
+    );
+
+    // ── Reverse engineering (MCP process tools) ──────────────────────────
+    items.push(sep('Reverse engineering (MCP)'));
+    items.push(
+        {
+            label: '$(search) AOB / Pattern Search',
+            detail: 'process/find_pattern',
+            command: 'enma.aobSearch',
+        },
+        {
+            label: '$(list-flat) Disassemble',
+            detail: 'process/disassemble',
+            command: 'enma.disassemble',
+        },
+        {
+            label: '$(symbol-method) Lookup Symbol',
+            detail: 'process/lookup_symbol',
+            command: 'enma.lookupSymbol',
+        },
+        {
+            label: '$(export) List Module Exports',
+            detail: 'process/list_module_exports',
+            command: 'enma.listExports',
+        },
+        {
+            label: '$(regex) AOB Pattern Explorer',
+            detail: 'Local hex/IDA pattern decoder webview',
+            command: 'enma.aob.explore',
+        },
+    );
+
+    // ── Reference panels ─────────────────────────────────────────────────
+    items.push(sep('Reference'));
+    items.push(
+        {
+            label: '$(circuit-board) Zydis Playground',
+            detail: 'encode / disasm reference',
+            command: 'enma.zydis.playground',
+        },
+        {
+            label: '$(server-process) Unicorn Panel',
+            detail: 'cpu_t / hooks reference',
+            command: 'enma.unicorn.panel',
+        },
+        {
+            label: '$(file-binary) Inspect .emb',
+            detail: 'Binary module inspector',
+            command: 'enma.inspectEmb',
+        },
+        {
+            label: '$(edit) Edit Project em.predefined',
+            command: 'enma.predefined.edit',
+        },
+        {
+            label: '$(diff) Diff With Snapshot…',
+            command: 'enma.snapshot.diff',
+        },
+    );
+
+    // ── Docs / settings (angel core) ─────────────────────────────────────
+    items.push(sep('Docs & settings'));
+    items.push(
         {
             label: '$(book) Open Perception Docs',
             detail: 'docs.perception.cx/perception',
@@ -220,17 +334,23 @@ async function showStatusBarMenu(): Promise<void> {
             command: 'enma.openDocsPanel',
         },
         { label: '$(gear) View Settings', detail: 'enma.*', command: 'enma.openSettings' },
-        { label: '$(play) Run Script (MCP)', detail: 'Engine MCP', command: 'enma.runScript' },
     );
 
-    const pick = await window.showQuickPick(items, { placeHolder: 'Perception Enma' });
-    if (pick) commands.executeCommand(pick.command);
+    const pick = await window.showQuickPick(items, {
+        placeHolder: 'Perception Enma — full toolkit',
+        matchOnDetail: true,
+        matchOnDescription: true,
+    });
+    if (pick?.command) commands.executeCommand(pick.command);
 }
 
 function registerCoreCommands(context: ExtensionContext): void {
     context.subscriptions.push(
         commands.registerCommand('enma.openSettings', () =>
             commands.executeCommand('workbench.action.openSettings', 'enma'),
+        ),
+        commands.registerCommand('enma.openMcpSettings', () =>
+            commands.executeCommand('workbench.action.openSettings', 'enma.mcp'),
         ),
     );
 }
@@ -327,32 +447,69 @@ function sendPermissionsToServer(ffi: boolean, file: boolean): void {
 function setupMcpStatusBar(context: ExtensionContext): void {
     s_mcpBar = window.createStatusBarItem(StatusBarAlignment.Right, 100);
     s_mcpBar.text = '$(plug) Enma MCP';
-    s_mcpBar.tooltip = `Enma MCP: ${discoverMcpEndpoint(
-        workspace.getConfiguration('enma.mcp').get<string>('endpoint') || undefined,
-    )}`;
+    s_mcpBar.command = 'enma.mcpStatusMenu';
+    s_mcpBar.tooltip = 'Enma MCP — click for engine tools';
     s_mcpBar.show();
     context.subscriptions.push(s_mcpBar);
 
     const refreshMcpStatus = async (): Promise<void> => {
-        const ep = discoverMcpEndpoint(
-            workspace.getConfiguration('enma.mcp').get<string>('endpoint') || undefined,
-        );
-        s_mcpBar!.tooltip = `Enma MCP: ${ep}`;
+        const cfg = workspace.getConfiguration('enma.mcp');
+        const enabled = cfg.get<boolean>('enabled', false);
+        const ep = discoverMcpEndpoint(cfg.get<string>('endpoint') || undefined);
+
+        if (!enabled) {
+            s_mcpBar!.text = '$(debug-disconnect) Enma MCP off';
+            s_mcpBar!.tooltip = `MCP disabled — click to enable\n${ep}`;
+            s_mcpBar!.backgroundColor = undefined;
+            return;
+        }
+
+        s_mcpBar!.tooltip = `Enma MCP: ${ep}\nClick for Run / Validate / RE tools`;
         const ok = await testMcpConnection(ep);
         if (ok) {
-            s_mcpBar!.text = '$(plug) Enma';
+            s_mcpBar!.text = '$(plug) Enma MCP';
             s_mcpBar!.backgroundColor = undefined;
         } else {
             s_mcpBar!.text = '$(error) Enma MCP';
             s_mcpBar!.backgroundColor = new ThemeColor('statusBarItem.errorBackground');
+            s_mcpBar!.tooltip = `Unreachable: ${ep}\nClick to reconnect or open settings`;
         }
     };
 
     refreshMcpStatus().catch(() => { /* keep default */ });
 
     context.subscriptions.push(
-        commands.registerCommand('enma.reconnectMcp', () => {
-            refreshMcpStatus().catch(() => { /* keep default */ });
+        commands.registerCommand('enma.reconnectMcp', async () => {
+            window.setStatusBarMessage('$(sync~spin) Probing Enma MCP…', 2000);
+            await refreshMcpStatus();
+        }),
+        commands.registerCommand('enma.mcpStatusMenu', async () => {
+            const cfg = workspace.getConfiguration('enma.mcp');
+            const enabled = cfg.get<boolean>('enabled', false);
+            const pick = await window.showQuickPick(
+                [
+                    {
+                        label: enabled ? '$(circle-slash) Disable MCP' : '$(plug) Enable MCP',
+                        command: 'toggle',
+                    },
+                    { label: '$(play) Run Script', command: 'enma.runScript' },
+                    { label: '$(check) Validate Script', command: 'enma.validateScript' },
+                    { label: '$(symbol-namespace) Get Engine Context', command: 'enma.getContext' },
+                    { label: '$(search) AOB Search', command: 'enma.aobSearch' },
+                    { label: '$(list-flat) Disassemble', command: 'enma.disassemble' },
+                    { label: '$(debug-disconnect) Reconnect', command: 'enma.reconnectMcp' },
+                    { label: '$(gear) MCP Settings', command: 'enma.openMcpSettings' },
+                    { label: '$(menu) Full toolkit menu', command: 'enma.statusBarMenu' },
+                ],
+                { placeHolder: 'Enma MCP' },
+            );
+            if (!pick) return;
+            if ((pick as { command: string }).command === 'toggle') {
+                await cfg.update('enabled', !enabled, true);
+                await refreshMcpStatus();
+                return;
+            }
+            commands.executeCommand((pick as { command: string }).command);
         }),
         workspace.onDidChangeConfiguration((e) => {
             if (!e.affectsConfiguration('enma.mcp')) return;

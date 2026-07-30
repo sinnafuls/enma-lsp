@@ -1,9 +1,22 @@
 # Changelog
 
-## 1.1.23 — angel-lsp-pcx 1:1 (Enma swap) + docs-aligned predefined
+## 1.1.23 — angel-lsp-pcx 1:1 (Enma swap) + full Enma toolkit + docs predefined
 
 Client/package surface matched to [angel-lsp-pcx](https://github.com/sinnafuls/angel-lsp-pcx)
-with AngelScript → Enma substitution, plus host/stdlib predefined refresh.
+with AngelScript → Enma substitution, **plus** the full Enma-only toolkit
+(MCP / RE / DAP / emb / panels) first-class in the UI.
+
+### Engine MCP + RE (Enma-best)
+
+- Left **Perception Enma** + right **Enma MCP** status menus expose every tool
+- `script/execute` — Run Script (`Ctrl+Alt+R`)
+- `script/validate` — Validate Script (`Ctrl+Alt+V`) + on-save when enabled
+- `script/get_context` — Get Engine Context
+- RE via MCP: AOB search, disassemble, symbol lookup, list exports
+- Local: AOB explorer, Zydis playground, Unicorn panel, `.emb` inspector
+- Enable/disable MCP from status menu; reconnect probe; MCP settings jump
+- Editor title Run/Validate/Bundle; explorer context menu on `.emb`
+- One-click **Enable Now** when MCP is off mid-command
 
 ### Client UX (1:1 with angel-lsp-pcx)
 

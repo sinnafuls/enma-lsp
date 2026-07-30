@@ -26,7 +26,9 @@ The entire Perception Enma API is bundled directly into the extension. Every fea
 | **Formatter** | Auto-format on type |
 | **Bundler** | Built-in multi-file bundler for `.em` projects |
 | **Debugger** | DAP attach proxy for the Enma SDK TCP server |
-| **Engine MCP** | Optional on-save `script/validate` + Run Script against a live engine |
+| **Engine MCP** | Full Perception bridge: `script/execute`, `script/validate` (on-save + manual), `script/get_context`, process RE tools |
+| **RE toolkit** | AOB search, disassemble, symbol lookup, module exports via MCP + local AOB explorer |
+| **Reference panels** | Zydis playground, Unicorn panel, offline docs webview, `.emb` inspector |
 
 ## Getting Started
 
@@ -119,9 +121,32 @@ Create an `em.predefined` (or `*.em.predefined`) in your project root — the LS
 | `enma.forceIncludePredefined` | `[]` | Extra `.em.predefined` files injected globally |
 | `enma.formatter.indentSpaces` | `4` | Indentation width |
 | `enma.formatter.useTabIndent` | `false` | Use tabs instead of spaces |
-| `enma.mcp.enabled` | `false` | On-save engine `script/validate` via MCP |
+| `enma.mcp.enabled` | `false` | Engine MCP: on-save validate, Run/Validate/Context, RE tools |
+| `enma.mcp.endpoint` | `http://127.0.0.1:9077/mcp` | Perception MCP HTTP endpoint |
 
 Full settings reference: [docs/user_settings.md](./docs/user_settings.md)
+
+## Engine MCP & reverse engineering
+
+Point the extension at a running Perception build’s MCP server
+([mcp-api](https://docs.perception.cx/perception/mcp-api.md)):
+
+1. Set `enma.mcp.enabled` = `true` (or use the right-hand **Enma MCP** status item).
+2. Default endpoint: `http://127.0.0.1:9077/mcp`.
+
+| Command / shortcut | Tool |
+|---|---|
+| **Enma: Run Script (MCP)** `Ctrl+Alt+R` | `script/execute` |
+| **Enma: Validate Script (MCP)** `Ctrl+Alt+V` | `script/validate` (also on every save when enabled) |
+| **Enma: Get Engine Context (MCP)** | `script/get_context` |
+| **Enma: AOB / Pattern Search** | `process/find_pattern` |
+| **Enma: Disassemble** | `process/disassemble` |
+| **Enma: Lookup Symbol** | `process/lookup_symbol` |
+| **Enma: List Module Exports** | `process/list_module_exports` |
+
+Engine diagnostics land in a separate **enma-mcp** Problems collection so they never mix with LSP analyzer noise. Output streams to the **Enma MCP** / **Enma RE** channels.
+
+Everything is also on the left **Perception Enma** status-bar menu and the right **Enma MCP** status menu.
 
 ## Credits
 

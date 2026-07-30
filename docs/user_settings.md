@@ -49,12 +49,33 @@ Settings live under the `enma.*` namespace (VS Code: **Enma: View Settings**).
 
 ## Engine MCP
 
+Docs: https://docs.perception.cx/perception/mcp-api.md
+
 | Setting | Default | Description |
 |---|---|---|
-| `enma.mcp.enabled` | `false` | Enable Run Script / on-save validate. |
-| `enma.mcp.endpoint` | — | Perception MCP HTTP endpoint. |
-| `enma.mcp.timeoutMs` | number | Per-call timeout. |
-| `enma.mcp.authToken` | — | Optional bearer token. |
+| `enma.mcp.enabled` | `false` | Master switch for engine MCP. When on: on-save `script/validate`, Run Script, Validate, Get Context, and RE commands. |
+| `enma.mcp.endpoint` | `http://127.0.0.1:9077/mcp` | Perception MCP HTTP endpoint. |
+| `enma.mcp.timeoutMs` | `5000` | Per-call timeout (ms). |
+| `enma.mcp.authToken` | `""` | Optional bearer token. |
+
+### Commands (also on status-bar menus)
+
+| Command | MCP tool / action |
+|---|---|
+| `Enma: Run Script (MCP)` (`Ctrl+Alt+R`) | `script/execute` |
+| `Enma: Validate Script (MCP)` (`Ctrl+Alt+V`) | `script/validate` |
+| `Enma: Get Engine Context (MCP)` | `script/get_context` |
+| `Enma: Reconnect MCP` | Re-probe endpoint + status bar |
+| `Enma: AOB / Pattern Search (MCP)` | `process/find_pattern` |
+| `Enma: Disassemble (MCP)` | `process/disassemble` |
+| `Enma: Lookup Symbol (MCP)` | `process/lookup_symbol` |
+| `Enma: List Module Exports (MCP)` | `process/list_module_exports` |
+| `Enma: AOB Pattern Explorer` | Local webview (no engine) |
+| `Enma: Zydis Playground` | Local reference webview |
+| `Enma: Unicorn Reference Panel` | Local reference webview |
+| `Enma: Inspect .emb Binary Module` | Explorer context on `.emb` |
+
+Engine diagnostics use the **enma-mcp** collection (separate from LSP).
 
 ## Multi-editor
 
