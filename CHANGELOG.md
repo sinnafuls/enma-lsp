@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.1.23 — angel-lsp-pcx 1:1 (Enma swap) + docs-aligned predefined
+
+Client/package surface matched to [angel-lsp-pcx](https://github.com/sinnafuls/angel-lsp-pcx)
+with AngelScript → Enma substitution, plus host/stdlib predefined refresh.
+
+### Client UX (1:1 with angel-lsp-pcx)
+
+- Left **Perception Enma** status bar (language-gated) + command quick-pick menu
+- Commands titled like angel: Bundle Script / Initialize Project / View Settings /
+  Open Perception Docs
+- `enma.openDocs` opens live docs in the browser (angel behavior)
+- `enma.openLangDocs` + offline `enma.openDocsPanel` webview kept as extras
+- Index-progress notification hook (`enma/indexProgress`)
+- `enma/smartBackspace` request stub (reserved)
+- `Enma: Initialize Project` scaffolds `int64 main()` lifecycle entry
+- Package branding: displayName **Enma for Perception**, icon, Debuggers category,
+  slim activation events (`onLanguage` + `workspaceContains` + `onDebug`)
+- README rewritten to mirror angel-lsp-pcx getting-started / bundler / layout docs
+
+### Predefined (host + std)
+
+Refresh against current Perception / Enma docs (`docs.perception.cx`, 2026-07-28 layout)
+and bring authoring-surface polish in line with `angel-lsp-pcx`.
+
+### Predefined (host + std)
+
+- **`perception.em.predefined` rewritten** from live host pages:
+  lifecycle, proc, cpu, gui, input, net, render, sound, unicorn, win, zydis.
+- **Free-function shapes** match type_builder limits: `body(r)`, `payload(m)`,
+  `get`/`set` for text widgets, `set_items` / `add_row`, `mem_read`/`mem_write`,
+  `process_name`/`title`/`class_name`, `get_selected`, zydis builder helpers.
+- **`const char*` + `string&` overloads** on string-taking natives.
+- **`dbg_print` / `dbg_print_int`** added; `print_console` kept as corpus alias.
+- **`proc_t`**: `get_eprocess`, pointer `rvm`/`wvm`, vector bulk forms; no `deref()`.
+- **`enma-std-containers.em.predefined`** — modern `std::vector` / `map` /
+  `unordered_map` / `optional` / `list` / `stack` / `queue` / `pair` surface.
+- **`data/docs-catalogue.json`** populated with the new free-fn / container symbols.
+
+### Analyzer / client (angel parity)
+
+- `server/src/compiler_analyzer/perceptionTypes.ts` — value / move-only host type registry.
+- `Enma: View Settings` command (`enma.openSettings`).
+- Language icons for `.em` / `.em.predefined`.
+- `workspaceContains:**/*.em` activation.
+- Semantic token type `keywordControl` contribution.
+- `AGENTS.md`, `docs/user_settings.md`.
+- README links updated off dead GitBook / `/perception/enma/*` paths.
+
+### Docs authority
+
+- Host: https://docs.perception.cx/perception/
+- Language: https://docs.perception.cx/perception/enma-lang/
+
+---
 ## Unreleased — Docs + standalone-LSP setup guide
 
 Docs follow-up for the parity sweep: a setup guide for hosting the language

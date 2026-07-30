@@ -281,3 +281,11 @@ export function registerEnmaTypes(global: SymbolGlobalScope, options?: {
     }
 
 }
+
+// Re-export Perception value-type registry (angel-lsp parity).
+export {
+    isPerceptionValueType,
+    isPerceptionMoveOnlyType,
+    PERCEPTION_HANDLE_VALUE_TYPES,
+    PERCEPTION_MOVE_ONLY_TYPES,
+} from './perceptionTypes';

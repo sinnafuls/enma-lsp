@@ -1,10 +1,21 @@
 # Docs MCP sync
 
 The bundled `.em.predefined` files are the source of truth for IntelliSense.
-New declarations are pulled from the upstream Enma + Perception documentation
-via two MCP servers — `enma-docs` and `perception-docs` — but the predefined
-files themselves are **append-only**: existing declarations are never
-overwritten, only added to.
+
+| File | Role |
+|---|---|
+| `enma-stdlib.em.predefined` | Auto-generated legacy snapshot (`npm run regenerate-stdlib`) |
+| `enma-std-containers.em.predefined` | Hand-maintained modern `std::vector` / map / optional surface |
+| `perception.em.predefined` | Hand-maintained Perception host API (current docs.perception.cx) |
+
+New declarations can also be pulled via a docs catalogue (below) — the
+predefined files themselves are **append-only** under that path: existing
+declarations are never overwritten, only added to. Structural free-fn vs
+method renames are hand-edits to `perception.em.predefined`.
+
+Primary docs roots:
+- Host: https://docs.perception.cx/perception/
+- Language: https://docs.perception.cx/perception/enma-lang/
 
 ## Catalogue format
 

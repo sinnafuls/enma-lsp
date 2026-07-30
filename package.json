@@ -1,19 +1,20 @@
 {
   "name": "enma-language",
-  "displayName": "Enma Language",
-  "description": "Syntax highlighting, snippets, hover docs, completion, signature help, and full LSP services for the Enma scripting language (.em).",
-  "version": "1.1.22",
+  "displayName": "Enma for Perception",
+  "description": "Enma Language Server pre-configured for Perception.cx — IntelliSense, type checking, bundler, and full API coverage out of the box.",
+  "version": "1.1.23",
   "publisher": "sin",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sin/enma-lsp"
+    "url": "https://github.com/sinnafuls/enma-lsp"
   },
   "engines": {
     "vscode": "^1.75.0"
   },
   "categories": [
     "Programming Languages",
+    "Debuggers",
     "Snippets"
   ],
   "main": "./client/dist/extension.js",
@@ -23,28 +24,17 @@
   "activationEvents": [
     "onLanguage:enma",
     "onLanguage:enma-predefined",
-    "onCommand:enma.bundle",
-    "onCommand:enma.bundleStripped",
-    "onCommand:enma.bundleProject",
-    "onCommand:enma.bundleAll",
-    "onCommand:enma.initProject",
-    "onCommand:enma.openDocs",
-    "onCommand:enma.runScript",
-    "onCommand:enma.template.scaffold",
-    "onCommand:enma.template.ci",
-    "onCommand:enma.predefined.edit",
-    "onCommand:enma.snapshot.diff",
-    "onCommand:enma.aob.explore",
-    "onCommand:enma.zydis.playground",
-    "onCommand:enma.unicorn.panel",
+    "workspaceContains:**/*.em",
     "onDebug",
     "onDebugResolve:enma-lsp-dap"
   ],
   "keywords": [
     "enma",
-    "scripting",
+    "perception",
+    "perception.cx",
     "lsp",
-    "language-server"
+    "language-server",
+    ".em"
   ],
   "workspaces": [
     "client",
@@ -61,7 +51,11 @@
         "extensions": [
           ".em"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "icons/enma.png",
+          "dark": "icons/enma.png"
+        }
       },
       {
         "id": "enma-predefined",
@@ -74,7 +68,11 @@
         "filenames": [
           "em.predefined"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "icons/enma-predefined.png",
+          "dark": "icons/enma-predefined.png"
+        }
       },
       {
         "id": "enma-binary",
@@ -111,32 +109,37 @@
     "commands": [
       {
         "command": "enma.bundle",
-        "title": "Bundle current project",
+        "title": "Bundle Script",
         "category": "Enma"
       },
       {
         "command": "enma.bundleStripped",
-        "title": "Bundle current project (strip comments)",
+        "title": "Bundle Script (Strip Comments)",
         "category": "Enma"
       },
       {
         "command": "enma.bundleProject",
-        "title": "Bundle a configured project",
+        "title": "Bundle Project...",
         "category": "Enma"
       },
       {
         "command": "enma.bundleAll",
-        "title": "Bundle all configured projects",
+        "title": "Bundle All Projects",
         "category": "Enma"
       },
       {
         "command": "enma.initProject",
-        "title": "Initialize Enma project (source + tasks.json)",
+        "title": "Initialize Project",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.openSettings",
+        "title": "View Settings",
         "category": "Enma"
       },
       {
         "command": "enma.openDocs",
-        "title": "Open Perception API Docs",
+        "title": "Open Perception Docs",
         "category": "Enma"
       },
       {
@@ -177,6 +180,21 @@
       {
         "command": "enma.unicorn.panel",
         "title": "Unicorn Reference Panel",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.statusBarMenu",
+        "title": "Status Bar Menu",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.openLangDocs",
+        "title": "Open Enma Language Docs",
+        "category": "Enma"
+      },
+      {
+        "command": "enma.openDocsPanel",
+        "title": "Open Docs Panel (Offline)",
         "category": "Enma"
       }
     ],
@@ -353,6 +371,9 @@
           "class.global:enma": "#4EC9B0",
           "enum.global:enma": "#4EC9B0"
         }
+      },
+      "[enma]": {
+        "editor.formatOnType": true
       }
     },
     "configuration": {
@@ -568,7 +589,27 @@
           }
         }
       }
-    }
+    },
+    "semanticTokenTypes": [
+      {
+        "id": "keywordControl",
+        "description": "For keywords that affect control flow.",
+        "superType": "keyword"
+      }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "enma",
+        "scopes": {
+          "keyword": [
+            "keyword.enma"
+          ],
+          "keywordControl": [
+            "keyword.control.enma"
+          ]
+        }
+      }
+    ]
   },
   "scripts": {
     "compile": "tsc -b && npm run copy-predefined && node esbuild.config.mjs",
@@ -599,5 +640,10 @@
     "mocha": "^10.3.0",
     "typescript": "^5.3.3",
     "vscode-languageclient": "^9.0.1"
+  },
+  "author": "sinnafuls",
+  "icon": "icons/enma.png",
+  "bugs": {
+    "url": "https://github.com/sinnafuls/enma-lsp/issues"
   }
 }
